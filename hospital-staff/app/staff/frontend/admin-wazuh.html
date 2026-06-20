@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Wazuh 대시보드 - MZ Clinic 관리자</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1200px; margin:80px auto 40px; padding:0 16px; }
+        .placeholder {
+            background:#fff; border-radius:12px; padding:60px 40px;
+            box-shadow:0 1px 6px rgba(0,0,0,.06);
+            text-align:center;
+        }
+        .wazuh-icon {
+            width:80px; height:80px; border-radius:20px;
+            background:#fef2f2; display:inline-flex;
+            align-items:center; justify-content:center;
+            margin-bottom:20px;
+        }
+        .wazuh-icon i { font-size:36px; color:#dc2626; }
+        .iframe-wrap {
+            width:100%; height:800px; border:none;
+            border-radius:8px; background:#f8fafc;
+            display:flex; align-items:center; justify-content:center;
+        }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <h2 style="margin-bottom:4px;font-size:20px;font-weight:800;color:#1e293b;">
+        <i class="fas fa-shield-virus" style="color:#dc2626;margin-right:8px;"></i>Wazuh 보안 모니터링
+    </h2>
+    <p style="color:#78909c;font-size:13px;margin-bottom:20px;">보안 이벤트 이상 탐지 · 로그인 이력 분석 · 위협 인텔리전스</p>
+
+    <div class="placeholder" id="wazuhContent">
+        <div class="wazuh-icon"><i class="fas fa-shield-virus"></i></div>
+        <h3 style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:8px;">Wazuh 대시보드</h3>
+        <p style="font-size:14px;color:#64748b;margin-bottom:24px;line-height:1.7;">
+            Wazuh 서버 주소를 설정하면 이 영역에 대시보드가 표시됩니다.<br>
+            로그인 이력 분석 및 이상 탐지는 Wazuh에서 전담합니다.
+        </p>
+        <div style="background:#f8fafc;border-radius:8px;padding:16px 24px;font-size:13px;color:#546e7a;text-align:left;display:inline-block;min-width:320px;">
+            <div style="font-weight:700;margin-bottom:10px;color:#374151;">
+                <i class="fas fa-info-circle" style="margin-right:6px;color:#1d4ed8;"></i>설정 방법
+            </div>
+            <div style="margin-bottom:6px;"><code style="background:#e2e8f0;padding:2px 6px;border-radius:3px;font-size:12px;">WAZUH_URL</code> 환경변수에 Wazuh 대시보드 URL 설정</div>
+            <div><code style="background:#e2e8f0;padding:2px 6px;border-radius:3px;font-size:12px;">예) https://wazuh.hospital.internal:5601</code></div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        if (me.role !== 'admin') { alert('관리자 권한이 필요합니다.'); location.href = 'index.html'; return; }
+
+        // WAZUH_URL이 설정되어 있으면 iframe으로 표시
+        // 실제 운영 시: config.js에 WAZUH_URL 추가 또는 백엔드에서 주입
+        if (typeof WAZUH_URL !== 'undefined' && WAZUH_URL) {
+            document.getElementById('wazuhContent').innerHTML =
+                `<iframe src="${WAZUH_URL}" class="iframe-wrap" allowfullscreen></iframe>`;
+        }
+    }
+    init();
+</script>
+</body>
+</html>

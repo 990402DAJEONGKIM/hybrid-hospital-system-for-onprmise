@@ -1,0 +1,23 @@
+services:
+  api-onprem:
+    build:
+      context: .
+      dockerfile: docker/api-onprem/Dockerfile
+    container_name: onprem-emr-api
+    env_file:
+      - /home/mspadmin/vault-agent/secrets/combined.env
+    network_mode: host
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+    volumes:
+      - /var/log/onprem-emr:/var/log/onprem-emr
+      - /home/mspadmin/vault-agent/secrets:/vault-secrets:ro
+      - /home/mspadmin/deidentification-api/app/hospital-staff/app/combined/backend:/app
+    environment:
+      - VAULT_TOKEN_FILE=/vault-secrets/.vault-token
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

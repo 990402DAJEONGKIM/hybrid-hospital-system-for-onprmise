@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - 김이박 종합병원</title>
+    <link rel="stylesheet" href="/css/tailwind.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-gray-100 h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-900 mb-2">김이박 종합병원</h1>
+            <p class="text-gray-500">서비스 이용을 위해 로그인해주세요.</p>
+        </div>
+
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">회원번호</label>
+                <input type="text" id="loginMemberNumber" required placeholder="회원번호 입력"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                <input type="password" id="loginPw" required
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+
+            <div id="apiError" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600"></div>
+
+            <button type="submit" id="submitBtn"
+                class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                로그인
+            </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-gray-600">
+            계정이 없으신가요?
+            <a href="signup.html" class="text-blue-600 font-bold hover:underline">회원가입</a>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const memberNumber = document.getElementById('loginMemberNumber').value.trim();
+            const pw           = document.getElementById('loginPw').value;
+            const apiErrorEl = document.getElementById('apiError');
+            const submitBtn  = document.getElementById('submitBtn');
+
+            apiErrorEl.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '로그인 중...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify({ member_number: memberNumber, password: pw }),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    // 토큰은 서버가 httpOnly 쿠키로 설정 — 클라이언트에서 저장 불필요
+                    // /auth/me로 비밀번호 만료 여부 확인 (쿠키 자동 전송)
+                    const meRes = await fetch(`${BASE_URL}/auth/me`, {
+                        credentials: 'include',
+                        headers: { 'X-API-Key': API_KEY },
+                    });
+                    const meData = await meRes.json();
+
+                    if (meData.password_expired) {
+                        window.location.href = 'change-password.html';
+                        return;
+                    }
+
+                    window.location.href = 'index.html';
+                } else {
+                    const message = data.detail || '로그인 중 오류가 발생했습니다.';
+                    apiErrorEl.textContent = message;
+                    apiErrorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                apiErrorEl.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+                apiErrorEl.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '로그인';
+            }
+        });
+    </script>
+</body>
+</html>

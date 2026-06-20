@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2단계 인증 설정 - 김이박 클리닉</title>
+    <link rel="stylesheet" href="/css/tailwind.min.css">
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 100%);
+            min-height: 100vh;
+        }
+        .card {
+            border-top: 4px solid #1d4ed8;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+        }
+        .submit-btn { background: #1d3a6e; transition: background 0.2s; }
+        .submit-btn:hover { background: #1e40af; }
+        .step-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 50%;
+            background: #1d4ed8;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:2rem 1rem;">
+
+    <div class="w-full max-w-md">
+
+        <!-- 로고 -->
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-white bg-opacity-10 mb-3">
+                <i class="fas fa-shield-alt text-2xl text-blue-300"></i>
+            </div>
+            <h1 class="text-xl font-bold text-white">김이박 클리닉</h1>
+            <p class="text-xs text-blue-300 mt-0.5 font-medium tracking-widest uppercase">2단계 인증 설정</p>
+        </div>
+
+        <!-- 카드 -->
+        <div class="card bg-white rounded-2xl p-6">
+
+            <!-- 1단계: 시작 화면 -->
+            <div id="stepStart">
+                <div class="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5">
+                    <i class="fas fa-info-circle text-blue-500 mt-0.5 flex-shrink-0"></i>
+                    <p class="text-xs text-blue-800 leading-relaxed">
+                        Google Authenticator 앱이 필요합니다.<br>
+                        앱 스토어에서 <strong>Google Authenticator</strong>를 먼저 설치해주세요.
+                    </p>
+                </div>
+
+                <div class="space-y-3 mb-6">
+                    <div class="flex items-center gap-3">
+                        <span class="step-badge">1</span>
+                        <p class="text-sm text-gray-600">Google Authenticator 앱 설치</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="step-badge">2</span>
+                        <p class="text-sm text-gray-600">아래 버튼으로 QR코드 생성</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="step-badge">3</span>
+                        <p class="text-sm text-gray-600">앱으로 QR코드 스캔</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="step-badge">4</span>
+                        <p class="text-sm text-gray-600">앱에 표시된 6자리 코드 입력</p>
+                    </div>
+                </div>
+
+                <button id="startBtn" class="submit-btn w-full text-white py-2.5 rounded-xl font-bold text-sm">
+                    <i class="fas fa-qrcode mr-2"></i>QR코드 생성하기
+                </button>
+            </div>
+
+            <!-- 2단계: QR코드 화면 -->
+            <div id="stepQr" class="hidden">
+                <p class="text-sm font-semibold text-gray-700 text-center mb-1">Google Authenticator로 스캔하세요</p>
+                <p class="text-xs text-gray-400 text-center mb-4">앱 → + 버튼 → QR 코드 스캔</p>
+
+                <div class="flex justify-center mb-4">
+                    <img id="qrImage" src="" alt="QR코드" class="w-48 h-48 border border-gray-200 rounded-xl p-2">
+                </div>
+
+                <!-- 수동 입력 키 -->
+                <div class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-5">
+                    <p class="text-xs text-gray-500 mb-1">QR 스캔이 안 될 경우 키를 직접 입력하세요</p>
+                    <p id="manualKey" class="text-sm font-mono font-bold text-gray-700 tracking-widest break-all"></p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">앱에 표시된 6자리 코드 입력</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                            <i class="fas fa-key text-sm"></i>
+                        </span>
+                        <input type="text" id="verifyCode" inputmode="numeric" maxlength="6"
+                            placeholder="000000" autocomplete="one-time-code"
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-700 outline-none bg-gray-50 focus:bg-white transition text-sm tracking-widest text-center font-mono">
+                    </div>
+                </div>
+
+                <div id="verifyError" style="display:none;" class="mt-3 p-2.5 bg-red-50 border border-red-300 rounded-xl text-xs text-red-700 items-center gap-2">
+                    <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+                    <span id="verifyErrorMsg"></span>
+                </div>
+
+                <button id="verifyBtn" class="submit-btn w-full text-white py-2.5 rounded-xl font-bold text-sm mt-4">
+                    <i class="fas fa-check-circle mr-2"></i>등록 완료
+                </button>
+            </div>
+
+            <!-- 3단계: 완료 화면 -->
+            <div id="stepDone" class="hidden text-center py-4">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+                    <i class="fas fa-check text-3xl text-green-500"></i>
+                </div>
+                <p class="text-lg font-bold text-gray-800 mb-1">2단계 인증 설정 완료</p>
+                <p class="text-sm text-gray-500 mb-6">다음 로그인부터 Google Authenticator 코드가 필요합니다.</p>
+                <button onclick="window.location.href='index.html'"
+                    class="submit-btn w-full text-white py-2.5 rounded-xl font-bold text-sm">
+                    <i class="fas fa-home mr-2"></i>메인으로 이동
+                </button>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-gray-100 text-center">
+                <p class="text-xs text-gray-400">2단계 인증 등록 후 서비스를 이용할 수 있습니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        // 로그인 확인 + MFA 등록 여부 확인
+        (async () => {
+            const res = await fetch(`${BASE_URL}/auth/me`, {
+                credentials: 'include',
+                headers: { 'X-API-Key': API_KEY },
+            }).catch(() => null);
+            if (!res || !res.ok) { window.location.href = 'login.html'; return; }
+            const me = await res.json();
+
+            if (me.mfa_enabled) {
+                // 이미 등록된 경우 → 안내 화면으로 대체
+                document.getElementById('stepStart').innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-100 mb-4">
+                            <i class="fas fa-check text-2xl text-green-500"></i>
+                        </div>
+                        <p class="text-base font-bold text-gray-800 mb-1">2단계 인증이 등록되어 있습니다.</p>
+                        <p class="text-xs text-gray-400 mb-6">재등록이 필요하면 관리자에게 문의하세요.</p>
+                        <button onclick="window.location.href='index.html'"
+                            class="submit-btn w-full text-white py-2.5 rounded-xl font-bold text-sm">
+                            <i class="fas fa-home mr-2"></i>메인으로 이동
+                        </button>
+                    </div>`;
+            }
+        })();
+
+        let qrSecret = '';
+
+        // QR코드 생성
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>생성 중...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/auth/mfa/setup`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'X-API-Key': API_KEY },
+                });
+
+                if (!res.ok) throw new Error('QR코드 생성에 실패했습니다.');
+                const data = await res.json();
+
+                // QR 이미지 표시
+                document.getElementById('qrImage').src = data.qr_image;
+
+                // 수동 입력 키 추출
+                const url = new URL(data.qr_url);
+                qrSecret = url.searchParams.get('secret') || '';
+                const formatted = qrSecret.match(/.{1,4}/g)?.join(' ') || qrSecret;
+                document.getElementById('manualKey').textContent = formatted;
+
+                document.getElementById('stepStart').classList.add('hidden');
+                document.getElementById('stepQr').classList.remove('hidden');
+                document.getElementById('verifyCode').focus();
+
+            } catch (e) {
+                alert(e.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-qrcode mr-2"></i>QR코드 생성하기';
+            }
+        });
+
+        // 코드 검증
+        document.getElementById('verifyBtn').addEventListener('click', async () => {
+            const code     = document.getElementById('verifyCode').value.trim();
+            const errorBox = document.getElementById('verifyError');
+            const errorMsg = document.getElementById('verifyErrorMsg');
+            const btn      = document.getElementById('verifyBtn');
+
+            errorBox.style.display = 'none';
+
+            if (code.length !== 6) {
+                errorMsg.textContent = '6자리 코드를 입력해주세요.';
+                errorBox.style.display = 'flex';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>확인 중...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/auth/mfa/setup/verify`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify({ code }),
+                });
+
+                if (res.status === 204) {
+                    document.getElementById('stepQr').classList.add('hidden');
+                    document.getElementById('stepDone').classList.remove('hidden');
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    errorMsg.textContent = data.detail || '코드가 올바르지 않습니다.';
+                    errorBox.style.display = 'flex';
+                    document.getElementById('verifyCode').value = '';
+                    document.getElementById('verifyCode').focus();
+                }
+            } catch {
+                errorMsg.textContent = '서버에 연결할 수 없습니다.';
+                errorBox.style.display = 'flex';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>등록 완료';
+            }
+        });
+
+        // 엔터키로 제출
+        document.getElementById('verifyCode').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('verifyBtn').click();
+        });
+    </script>
+</body>
+</html>

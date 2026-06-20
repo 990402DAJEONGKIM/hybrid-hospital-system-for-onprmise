@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>로그인 이력 - MZ Clinic 관리자</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1200px; margin:80px auto 40px; padding:0 16px; }
+        .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+        .toolbar label { font-size:14px; color:#546e7a; font-weight:600; }
+        .toolbar select, .toolbar input[type="text"], .toolbar input[type="number"] {
+            padding:8px 10px; border:1px solid #cfd8dc; border-radius:6px; font-size:14px;
+        }
+        .toolbar button { padding:8px 18px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .data-table th { background:#eceff1; padding:9px 12px; text-align:left; font-weight:600; color:#546e7a; border-bottom:2px solid #cfd8dc; white-space:nowrap; }
+        .data-table td { padding:9px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+        .data-table tr:hover td { background:#f9f9f9; }
+        .result-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
+        .result-success { background:#e8f5e9; color:#2e7d32; }
+        .result-fail    { background:#fff8e1; color:#e65100; }
+        .result-locked  { background:#ffebee; color:#c62828; }
+        .empty-msg { text-align:center; padding:40px; color:#90a4ae; }
+        .stat-bar { display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+        .stat-card { background:#fff; border-radius:8px; padding:14px 20px; border:1px solid #e0e0e0; flex:1; min-width:140px; }
+        .stat-card .val { font-size:24px; font-weight:700; margin-bottom:2px; }
+        .stat-card .lbl { font-size:12px; color:#90a4ae; }
+        .stat-success { border-top:3px solid #4caf50; }
+        .stat-fail    { border-top:3px solid #ff9800; }
+        .stat-locked  { border-top:3px solid #e53935; }
+        .back-link { font-size:13px; color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-bottom:16px; }
+        .back-link:hover { text-decoration:underline; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <a class="back-link" href="index.html"><i class="fas fa-arrow-left"></i> 대시보드</a>
+    <h2 style="margin-bottom:4px;">로그인 이력</h2>
+    <p style="color:#78909c;font-size:14px;margin-bottom:20px;">로그인 성공·실패·잠금 이력 (최신순)</p>
+
+    <!-- 통계 카드 -->
+    <div class="stat-bar" id="statBar">
+        <div class="stat-card stat-success"><div class="val" id="cntSuccess">-</div><div class="lbl">성공</div></div>
+        <div class="stat-card stat-fail"   ><div class="val" id="cntFail">-</div><div class="lbl">실패</div></div>
+        <div class="stat-card stat-locked" ><div class="val" id="cntLocked">-</div><div class="lbl">잠금</div></div>
+        <div class="stat-card"             ><div class="val" id="cntTotal">-</div><div class="lbl">전체</div></div>
+    </div>
+
+    <div class="toolbar">
+        <label>결과</label>
+        <select id="resultFilter">
+            <option value="">전체</option>
+            <option value="success">성공</option>
+            <option value="fail">실패</option>
+            <option value="locked">잠금</option>
+        </select>
+        <label>이메일</label>
+        <input type="text" id="emailFilter" placeholder="검색..." style="width:200px;">
+        <label>최대 건수</label>
+        <input type="number" id="limitInput" value="100" min="10" max="500" style="width:80px;">
+        <button onclick="load()">조회</button>
+        <button onclick="resetFilter()" style="background:#eceff1;color:#546e7a;">초기화</button>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>시각</th>
+                <th>이메일</th>
+                <th>결과</th>
+                <th>IP 주소</th>
+                <th>User-Agent</th>
+            </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+    </table>
+</div>
+
+</div>
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        if (me.role !== 'admin') { alert('관리자 권한이 필요합니다.'); location.href = 'index.html'; return; }
+        await load();
+    }
+
+    async function load() {
+        const result = document.getElementById('resultFilter').value;
+        const email  = document.getElementById('emailFilter').value.trim();
+        const limit  = document.getElementById('limitInput').value || 100;
+
+        let path = `/admin/login-history?limit=${limit}`;
+        if (result) path += `&result=${result}`;
+        if (email)  path += `&email=${encodeURIComponent(email)}`;
+
+        const res = await apiCall(path);
+        if (!res || !res.ok) {
+            document.getElementById('histBody').innerHTML =
+                `<tr><td colspan="5" class="empty-msg">로그인 이력을 불러오지 못했습니다.</td></tr>`;
+            return;
+        }
+        const logs = await res.json();
+        renderStats(logs);
+        renderTable(logs);
+    }
+
+    function renderStats(logs) {
+        const counts = { success: 0, fail: 0, locked: 0 };
+        logs.forEach(l => { if (counts[l.result] !== undefined) counts[l.result]++; });
+        document.getElementById('cntSuccess').textContent = counts.success;
+        document.getElementById('cntFail').textContent    = counts.fail;
+        document.getElementById('cntLocked').textContent  = counts.locked;
+        document.getElementById('cntTotal').textContent   = logs.length;
+    }
+
+    function renderTable(logs) {
+        const tbody = document.getElementById('histBody');
+        if (!logs.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-msg">조회된 이력이 없습니다.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = logs.map(l => {
+            const ts  = l.event_at ? l.event_at.replace('T', ' ').slice(0, 19) : '-';
+            const ua  = l.user_agent ? l.user_agent.slice(0, 60) + (l.user_agent.length > 60 ? '…' : '') : '-';
+            const cls = l.result === 'success' ? 'result-success'
+                      : l.result === 'locked'  ? 'result-locked'
+                      : 'result-fail';
+            const lbl = l.result === 'success' ? '성공'
+                      : l.result === 'locked'  ? '잠금'
+                      : '실패';
+            return `
+            <tr>
+                <td style="white-space:nowrap;">${ts}</td>
+                <td>${l.email || '-'}</td>
+                <td><span class="result-badge ${cls}">${lbl}</span></td>
+                <td style="font-family:monospace;">${l.ip_address || '-'}</td>
+                <td style="font-size:12px;color:#78909c;">${ua}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function resetFilter() {
+        document.getElementById('resultFilter').value = '';
+        document.getElementById('emailFilter').value  = '';
+        document.getElementById('limitInput').value   = 100;
+        load();
+    }
+
+    init();
+</script>
+</body>
+</html>

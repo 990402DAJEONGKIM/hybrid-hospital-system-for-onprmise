@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>내 진료 일정 - MZ Clinic 의사</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1100px; margin:80px auto 40px; padding:0 16px; }
+
+        /* 탭 */
+        .tab-bar { display:flex; gap:0; margin-bottom:20px; border-bottom:2px solid #e2e8f0; }
+        .tab-btn {
+            padding:10px 24px; font-size:14px; font-weight:600;
+            border:none; background:none; cursor:pointer; color:#94a3b8;
+            border-bottom:2px solid transparent; margin-bottom:-2px;
+            transition:color .15s, border-color .15s;
+        }
+        .tab-btn.active { color:#1d4ed8; border-bottom-color:#1d4ed8; }
+        .tab-btn:hover:not(.active) { color:#475569; }
+
+        /* 필터 */
+        .filter-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+        .filter-bar label { font-size:13px; color:#546e7a; font-weight:600; }
+        .filter-bar select { padding:7px 10px; border:1px solid #cfd8dc; border-radius:6px; font-size:13px; }
+        .filter-bar button { padding:7px 16px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:13px; cursor:pointer; }
+        .filter-bar button:hover { opacity:.85; }
+
+        /* 테이블 */
+        .data-table { width:100%; border-collapse:collapse; font-size:14px; }
+        .data-table th { background:#f8fafc; padding:10px 12px; text-align:left; font-weight:700; color:#475569; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+        .data-table td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+        .data-table tr.is-terminal td { opacity:.45; }
+        .data-table tr.is-terminal:hover td { opacity:.6; }
+        .data-table tr:not(.is-terminal):hover td { background:#f8fafc; }
+
+        /* 상태 배지 */
+        .status-badge { padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; white-space:nowrap; }
+        .s-pending   { background:#fff8e1; color:#f57f17; }
+        .s-confirmed { background:#e8f5e9; color:#2e7d32; }
+        .s-cancelled { background:#ffebee; color:#c62828; }
+        .s-completed { background:#e3f2fd; color:#1565c0; }
+        .s-no_show   { background:#f3e5f5; color:#6a1b9a; }
+
+        .patient-name { font-weight:700; color:#1e293b; }
+
+        /* EMR 이동 버튼 */
+        .btn-emr { padding:5px 12px; background:#ede9fe; color:#7c3aed; border:none;
+                   border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; }
+        .btn-emr:hover { background:#ddd6fe; }
+
+        .empty-msg { text-align:center; padding:40px; color:#94a3b8; font-size:13px; }
+        #errMsg { color:#e53935; font-size:13px; margin-bottom:10px; min-height:18px; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <h2 style="margin-bottom:4px;font-size:20px;font-weight:800;color:#1e293b;">내 진료 일정</h2>
+
+    <!-- 탭 -->
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tab-today" onclick="switchTab('today')">
+            <i class="fas fa-calendar-day" style="margin-right:5px;"></i>오늘
+        </button>
+        <button class="tab-btn" id="tab-week" onclick="switchTab('week')">
+            <i class="fas fa-calendar-week" style="margin-right:5px;"></i>향후 7일
+        </button>
+    </div>
+
+    <!-- 필터 -->
+    <div class="filter-bar">
+        <label>상태</label>
+        <select id="statusFilter">
+            <option value="">전체</option>
+            <option value="pending">대기</option>
+            <option value="confirmed">확정</option>
+            <option value="completed">완료</option>
+            <option value="cancelled">취소</option>
+            <option value="no_show">미내원</option>
+        </select>
+        <button onclick="load()">조회</button>
+    </div>
+
+    <div id="errMsg"></div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>날짜</th>
+                <th>시간</th>
+                <th>유형</th>
+                <th>진료과</th>
+                <th>상태</th>
+                <th>환자</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="scheduleBody">
+            <tr><td colspan="6" class="empty-msg">로딩 중...</td></tr>
+        </tbody>
+    </table>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    let _currentMode = 'today';
+    // patient_id_hash → { patient_name, patient_id } 캐시 (재조회 방지)
+    const _nameCache = {};
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        if (me.role !== 'doctor') {
+            alert('의사 계정만 접근할 수 있습니다.');
+            location.href = 'index.html';
+            return;
+        }
+        await load();
+    }
+
+    function switchTab(mode) {
+        _currentMode = mode;
+        document.getElementById('tab-today').classList.toggle('active', mode === 'today');
+        document.getElementById('tab-week').classList.toggle('active',  mode === 'week');
+        load();
+    }
+
+    async function load() {
+        document.getElementById('errMsg').textContent = '';
+        const status = document.getElementById('statusFilter').value;
+        let path = `/portal/doctor/appointments/today?mode=${_currentMode}`;
+        if (status) path += `&status_code=${status}`;
+
+        const res = await apiCall(path);
+        if (!res || !res.ok) {
+            document.getElementById('errMsg').textContent = '일정을 불러오지 못했습니다.';
+            document.getElementById('scheduleBody').innerHTML =
+                `<tr><td colspan="6" class="empty-msg">조회에 실패했습니다.</td></tr>`;
+            return;
+        }
+        const list = await res.json();
+        if (!list.length) { renderTable(list); return; }
+
+        // 고유 hash만 추출해 온프레미스에 병렬 조회 (캐시 미스된 것만)
+        const uniqueHashes = [...new Set(list.map(a => a.patient_id_hash).filter(Boolean))];
+        const uncached = uniqueHashes.filter(h => !_nameCache[h]);
+
+        await Promise.all(uncached.map(async hash => {
+            try {
+                const r = await apiCall(`/emr/patients/by-hash/${hash}`);
+                if (r && r.ok) {
+                    const d = await r.json();
+                    _nameCache[hash] = { patient_name: d.patient_name, patient_id: d.patient_id };
+                } else {
+                    _nameCache[hash] = { patient_name: '조회 실패', patient_id: null };
+                }
+            } catch {
+                _nameCache[hash] = { patient_name: '조회 실패', patient_id: null };
+            }
+        }));
+
+        renderTable(list);
+    }
+
+    function renderTable(list) {
+        const tbody = document.getElementById('scheduleBody');
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="empty-msg">해당 일정이 없습니다.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = list.map(a => {
+            const sCls      = 's-' + (a.status_code || 'pending');
+            const termCls   = a.is_terminal ? 'is-terminal' : '';
+            const timeStr   = a.appointment_time || '-';
+            const dateStr   = _currentMode === 'week' ? a.appointment_date : '';
+            const cached    = _nameCache[a.patient_id_hash] || {};
+            const name      = cached.patient_name || '-';
+            const patientId = cached.patient_id   || '';
+            const emrDisabled = !patientId ? 'disabled style="opacity:.35;cursor:not-allowed;"' : '';
+
+            return `<tr class="${termCls}" data-hash="${a.patient_id_hash}">
+                <td style="color:#64748b;font-size:13px;">${dateStr || '<span style="color:#94a3b8">오늘</span>'}</td>
+                <td style="font-weight:700;">${timeStr}</td>
+                <td>${a.type_name || '-'}</td>
+                <td>${a.department_name || a.department_code || '-'}</td>
+                <td><span class="status-badge ${sCls}">${a.status_name || a.status_code || '-'}</span></td>
+                <td><span class="patient-name">${name}</span></td>
+                <td>
+                    <button class="btn-emr" ${emrDisabled}
+                            onclick="goEmr('${a.patient_id_hash}')">
+                        <i class="fas fa-file-medical" style="margin-right:4px;"></i>EMR
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function goEmr(hash) {
+        const cached = _nameCache[hash];
+        if (!cached || !cached.patient_id) return;
+        const url = `/my-patients.html?patient_id=${cached.patient_id}&hash=${hash}`;
+        if (typeof loadPage === 'function') loadPage(url);
+        else location.href = url;
+    }
+
+    init();
+</script>
+</body>
+</html>

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>환자 검색 — 김이박 병원</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1100px; margin:80px auto 40px; padding:0 16px; }
+
+        /* 검색바 */
+        .search-bar { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+        .search-bar input { flex:1; min-width:200px; padding:9px 12px; border:1px solid #cfd8dc; border-radius:6px; font-size:14px; }
+        .search-bar button { padding:9px 20px; background:var(--primary,#1e88e5); color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+        .search-bar button:hover { opacity:.85; }
+
+        .isms-notice { background:#fff8e1; border:1px solid #f59e0b; border-radius:6px; padding:10px 16px; font-size:12px; color:#92400e; margin-bottom:18px; }
+
+        /* 목록 테이블 */
+        .data-table { width:100%; border-collapse:collapse; font-size:14px; }
+        .data-table th { background:#f8fafc; padding:10px 12px; text-align:left; font-weight:700; color:#475569; border-bottom:2px solid #e2e8f0; }
+        .data-table td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+        .data-table tr:hover td { background:#f8fafc; }
+        .empty-msg { text-align:center; padding:40px; color:#94a3b8; }
+        #errMsg { color:#e53935; font-size:13px; margin-bottom:10px; min-height:18px; }
+
+        /* EMR 모달 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; align-items:center; justify-content:center; }
+        .modal-overlay.open { display:flex; }
+        .modal-box { background:#fff; border-radius:12px; padding:0; max-width:800px; width:100%; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+        .modal-header { padding:20px 24px 16px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:flex-start; flex-shrink:0; }
+        .modal-header h3 { margin:0; font-size:18px; font-weight:800; color:#1e293b; }
+        .modal-header p { margin:4px 0 0; font-size:12px; color:#94a3b8; }
+        .modal-body { overflow-y:auto; padding:20px 24px; flex:1; }
+        .modal-footer { padding:14px 24px; border-top:1px solid #e2e8f0; display:flex; gap:10px; flex-shrink:0; background:#f8fafc; border-radius:0 0 12px 12px; }
+        .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:#78909c; padding:0; line-height:1; }
+
+        /* Break-glass 배너 */
+        .break-glass-banner { background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:10px 16px; font-size:13px; color:#991b1b; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+        /* EMR 섹션 */
+        .emr-section { margin-bottom:20px; }
+        .emr-section-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#94a3b8; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e2e8f0; }
+
+        /* 환자 기본정보 카드 */
+        .patient-card { background:#f8fafc; border-radius:8px; padding:14px 18px; display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:20px; }
+        .patient-card .field-label { font-size:11px; color:#94a3b8; font-weight:600; margin-bottom:2px; }
+        .patient-card .field-value { font-size:14px; font-weight:700; color:#1e293b; }
+
+        /* 알레르기 배지 */
+        .allergy-list { display:flex; flex-direction:column; gap:6px; }
+        .allergy-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; font-size:13px; }
+        .sev-HIGH   { background:#fee2e2; border-left:3px solid #ef4444; }
+        .sev-MEDIUM { background:#fff7ed; border-left:3px solid #f97316; }
+        .sev-LOW    { background:#f0fdf4; border-left:3px solid #22c55e; }
+        .sev-badge { font-size:11px; font-weight:700; padding:1px 6px; border-radius:10px; }
+        .sev-badge-HIGH   { background:#ef4444; color:#fff; }
+        .sev-badge-MEDIUM { background:#f97316; color:#fff; }
+        .sev-badge-LOW    { background:#22c55e; color:#fff; }
+
+        /* 내원 이력 */
+        .encounter-item { padding:8px 12px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:6px; font-size:13px; }
+        .encounter-item .enc-meta { color:#64748b; font-size:12px; margin-top:3px; }
+        .encounter-item .enc-complaint { color:#374151; font-style:italic; font-size:12px; margin-top:3px; border-left:2px solid #cbd5e1; padding-left:8px; }
+        .enc-status-badge { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+        .enc-open      { background:#d1fae5; color:#065f46; }
+        .enc-closed    { background:#dbeafe; color:#1e40af; }
+        .enc-cancelled { background:#fee2e2; color:#991b1b; }
+
+        /* 진단 */
+        .diagnosis-item { padding:7px 10px; border-left:3px solid #6366f1; background:#f5f3ff; border-radius:0 6px 6px 0; margin-bottom:6px; font-size:13px; }
+        .diagnosis-text { color:#374151; margin-top:2px; font-size:12px; }
+        .diagnosis-primary { font-size:11px; font-weight:700; color:#7c3aed; }
+
+        /* 노트 */
+        .note-item { background:#fafafa; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-bottom:6px; font-size:13px; }
+        .note-meta { font-size:11px; color:#94a3b8; margin-bottom:4px; }
+        .note-text { color:#374151; line-height:1.5; white-space:pre-wrap; }
+
+        /* 수술 이력 */
+        .surgery-item { padding:7px 10px; background:#f0fdf4; border-left:3px solid #10b981; border-radius:0 6px 6px 0; margin-bottom:6px; font-size:13px; }
+
+        /* 버튼 */
+        .btn-emr   { padding:5px 12px; background:#ede9fe; color:#7c3aed; border:none; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; }
+        .btn-emr:hover { background:#ddd6fe; }
+        .btn-start { padding:10px 22px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
+        .btn-start:hover { background:#047857; }
+        .btn-close { padding:10px 22px; background:#e2e8f0; color:#374151; border:none; border-radius:8px; font-size:14px; cursor:pointer; }
+        .btn-close:hover { background:#cbd5e1; }
+
+        /* ── 분할 레이아웃 (SFR-018 진료 기록) ─────────────────── */
+        .split-wrap { display:grid; grid-template-columns:1fr 1fr; gap:20px; height:calc(100vh - 200px); }
+        .split-panel { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.06); overflow-y:auto; display:flex; flex-direction:column; }
+        .split-panel-header { padding:14px 18px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700; color:#1e293b; flex-shrink:0; display:flex; align-items:center; gap:8px; }
+        .split-panel-body { padding:16px 18px; flex:1; overflow-y:auto; }
+
+        /* 진료 폼 */
+        .form-row { margin-bottom:16px; }
+        .form-row label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; }
+        .form-row select,
+        .form-row input[type="text"],
+        .form-row textarea { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box; background:#f9fafb; transition:border-color .15s; }
+        .form-row select:focus,
+        .form-row input:focus,
+        .form-row textarea:focus { border-color:#6366f1; background:#fff; outline:none; }
+        .form-row textarea { resize:vertical; min-height:80px; }
+        .form-divider { border:none; border-top:1px dashed #e2e8f0; margin:16px 0; }
+        .form-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#94a3b8; margin-bottom:10px; }
+        .btn-submit { width:100%; padding:12px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; }
+        .btn-submit:hover { background:#047857; }
+        .btn-submit:disabled { opacity:.5; cursor:not-allowed; }
+        #saveMsg { font-size:13px; margin-top:8px; min-height:18px; text-align:center; }
+
+        /* 뒤로 가기 헤더 */
+        .split-topbar { display:flex; align-items:center; gap:16px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #e2e8f0; }
+        .btn-back { background:none; border:none; color:var(--primary,#1e88e5); font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; padding:0; }
+        .btn-back:hover { text-decoration:underline; }
+        .split-patient-info { font-size:15px; font-weight:800; color:#1e293b; }
+        .split-patient-sub { font-size:12px; color:#94a3b8; margin-left:8px; }
+
+        /* 간호사/관리자 전용 뷰 (기존 스타일 유지) */
+        .nurse-search .search-bar input:first-child { flex:1; }
+        .modal-box-sm { max-width:640px; }
+        .detail-section { margin-top:16px; }
+        .detail-section h4 { font-size:13px; font-weight:700; color:#546e7a; margin:12px 0 6px; text-transform:uppercase; letter-spacing:.5px; }
+        .detail-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .detail-table th { width:120px; text-align:left; padding:6px 8px; color:#78909c; font-weight:600; background:#f9fafb; }
+        .detail-table td { padding:6px 8px; color:#374151; }
+        .detail-table tr { border-bottom:1px solid #f0f0f0; }
+        .sub-list { font-size:13px; padding-left:0; list-style:none; }
+        .sub-list li { padding:4px 0; border-bottom:1px solid #f0f0f0; color:#374151; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <h2 style="margin-bottom:4px;font-size:20px;font-weight:800;color:#1e293b;" id="pageTitle">환자 검색</h2>
+    <p style="color:#78909c;font-size:13px;margin-bottom:16px;" id="pageDesc">로딩 중...</p>
+
+    <div id="searchSection">
+
+    <!-- 의사 전용 검색 (SFR-018) -->
+    <div id="doctorSearchBar" style="display:none;">
+        <div class="search-bar">
+            <input id="doctorQuery" type="text" placeholder="환자명 또는 회원번호" />
+            <button onclick="doSearch()"><i class="fas fa-search" style="margin-right:5px;"></i>검색</button>
+        </div>
+    </div>
+
+    <!-- 간호사/관리자 검색 (SFR-026: 이름 또는 회원번호) -->
+    <div id="nurseSearchBar" style="display:none;" class="nurse-search">
+        <div class="search-bar">
+            <input id="nurseQuery" type="text" placeholder="환자 이름 또는 회원번호" />
+            <button onclick="doNurseSearch()"><i class="fas fa-search" style="margin-right:5px;"></i>검색</button>
+        </div>
+    </div>
+
+    <div id="errMsg"></div>
+
+    <!-- 의사 결과 테이블 -->
+    <table class="data-table" id="doctorResultTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>회원번호</th>
+                <th>환자명</th>
+                <th>생년월일</th>
+                <th>성별</th>
+                <th>마지막 내원</th>
+                <th>EMR</th>
+            </tr>
+        </thead>
+        <tbody id="doctorBody">
+            <tr><td colspan="6" class="empty-msg">검색어를 입력하고 검색하세요.</td></tr>
+        </tbody>
+    </table>
+
+    <!-- 간호사/관리자 결과 테이블 (SFR-026) -->
+    <table class="data-table" id="nurseResultTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>회원번호</th>
+                <th>환자명</th>
+                <th>생년월일</th>
+                <th>성별</th>
+                <th>마지막 방문</th>
+                <th>작업</th>
+            </tr>
+        </thead>
+        <tbody id="nurseBody">
+            <tr><td colspan="6" class="empty-msg">검색어를 입력하고 검색 버튼을 누르세요.</td></tr>
+        </tbody>
+    </table>
+
+    </div><!-- /searchSection -->
+
+    <!-- ── 분할 레이아웃 (진료 기록 작성) ─────────────────────── -->
+    <div id="splitView" style="display:none;">
+        <div class="split-topbar">
+            <button class="btn-back" onclick="backToSearch()">
+                <i class="fas fa-arrow-left"></i> 검색으로 돌아가기
+            </button>
+            <span class="split-patient-info" id="splitPatientName"></span>
+            <span class="split-patient-sub"  id="splitPatientSub"></span>
+        </div>
+
+        <div class="split-wrap">
+            <!-- 왼쪽: EMR -->
+            <div class="split-panel">
+                <div class="split-panel-header">
+                    <i class="fas fa-file-medical" style="color:#6366f1;"></i> 환자 기록 (EMR)
+                </div>
+                <div class="split-panel-body" id="splitEmrContent">
+                    <div class="empty-msg">로딩 중...</div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 신규 진료 기록 폼 -->
+            <div class="split-panel">
+                <div class="split-panel-header">
+                    <i class="fas fa-stethoscope" style="color:#059669;"></i> 신규 진료 기록
+                </div>
+                <div class="split-panel-body">
+                    <form id="encounterForm" onsubmit="submitEncounter(event)">
+                        <div class="form-section-label">진료 정보</div>
+
+                        <div class="form-row">
+                            <label>진료 유형 <span style="color:#ef4444;">*</span></label>
+                            <select id="fEncType" required>
+                                <option value="">선택</option>
+                                <option value="outpatient_new">초진 외래</option>
+                                <option value="outpatient_return">재진 외래</option>
+                                <option value="inpatient">입원</option>
+                                <option value="pre_surgery">수술 전</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <label>진료과 <span style="color:#ef4444;">*</span></label>
+                            <select id="fDept" required>
+                                <option value="">선택</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <label>주호소</label>
+                            <textarea id="fComplaint" placeholder="환자가 호소하는 주된 증상을 입력하세요." rows="3"></textarea>
+                        </div>
+
+                        <hr class="form-divider">
+                        <div class="form-section-label">진단 (선택)</div>
+
+                        <div class="form-row">
+                            <label>진단 코드 (ICD)</label>
+                            <input type="text" id="fDiagCode" placeholder="예: J00" />
+                        </div>
+
+                        <div class="form-row">
+                            <label>진단명 (원문)</label>
+                            <input type="text" id="fDiagText" placeholder="예: 급성 비인두염" />
+                        </div>
+
+                        <div class="form-row" style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" id="fIsPrimary" style="width:auto;">
+                            <label for="fIsPrimary" style="margin:0;font-size:13px;font-weight:600;color:#374151;">주진단</label>
+                        </div>
+
+                        <hr class="form-divider">
+                        <div class="form-section-label">임상 노트 (선택)</div>
+
+                        <div class="form-row">
+                            <label>진료 노트</label>
+                            <textarea id="fNoteText" placeholder="진료 내용, 처방, 특이사항 등을 기록하세요." rows="5"></textarea>
+                        </div>
+
+                        <div id="saveMsg"></div>
+                        <button type="submit" class="btn-submit" id="submitBtn">
+                            <i class="fas fa-save" style="margin-right:6px;"></i>진료 완료 저장
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 의사 EMR 모달 -->
+<div class="modal-overlay" id="emrModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div>
+                <h3 id="emrModalTitle">EMR</h3>
+                <p id="emrModalSub"></p>
+            </div>
+            <button class="modal-close" onclick="closeEmrModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="emrModalBody">
+            <div style="text-align:center;padding:40px;color:#94a3b8;">
+                <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
+                <p style="margin-top:12px;">EMR 데이터를 불러오는 중...</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-start" id="startEncounterBtn" onclick="startEncounter()">
+                <i class="fas fa-stethoscope" style="margin-right:6px;"></i>진료 시작
+            </button>
+            <button class="btn-close" onclick="closeEmrModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 간호사/관리자 상세 모달 (기존) -->
+<div class="modal-overlay" id="nurseDetailModal">
+    <div class="modal-box modal-box-sm">
+        <div class="modal-header">
+            <div>
+                <h3 id="nurseModalTitle">환자 상세</h3>
+                <p>조회 시각: <span id="auditTs"></span></p>
+            </div>
+            <button class="modal-close" onclick="closeNurseModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-section">
+                <h4>기본 정보</h4>
+                <table class="detail-table">
+                    <tr><th>환자명</th><td id="dName"></td></tr>
+                    <tr><th>생년월일</th><td id="dBirth"></td></tr>
+                    <tr><th>성별</th><td id="dGender"></td></tr>
+                    <tr><th>전화번호</th><td id="dPhone"></td></tr>
+                </table>
+            </div>
+            <div class="detail-section">
+                <h4>내원 이력</h4>
+                <ul class="sub-list" id="dEncounters"><li>없음</li></ul>
+            </div>
+            <div class="detail-section">
+                <h4>알레르기</h4>
+                <ul class="sub-list" id="dAllergies"><li>없음</li></ul>
+            </div>
+            <div id="doctorSection2" style="display:none;">
+                <div class="detail-section">
+                    <h4>진단</h4>
+                    <ul class="sub-list" id="dDiagnoses"><li>없음</li></ul>
+                </div>
+                <div class="detail-section">
+                    <h4>수술 이력</h4>
+                    <ul class="sub-list" id="dSurgeries"><li>없음</li></ul>
+                </div>
+            </div>
+            <!-- 퇴원 처리 (입원 중인 경우에만 표시) -->
+            <div id="dischargeArea" style="display:none;margin-top:16px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;">
+                <div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:8px;">
+                    <i class="fas fa-procedures" style="margin-right:6px;"></i>현재 입원 중
+                </div>
+                <button onclick="doDischarge()" style="padding:8px 18px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">
+                    <i class="fas fa-sign-out-alt" style="margin-right:5px;"></i>퇴원 처리
+                </button>
+                <span style="font-size:11px;color:#94a3b8;margin-left:8px;">온프레미스 + 병동 병상 동시 업데이트</span>
+            </div>
+
+            <div style="margin-top:16px;display:flex;gap:10px;">
+                <button onclick="closeNurseModal()" style="padding:8px 18px;background:#eceff1;color:#546e7a;border:none;border-radius:6px;font-size:14px;cursor:pointer;">닫기</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    let _currentRole = null;
+    let _currentPatientId = null;   // EMR 모달에서 진료 시작 시 사용
+    let _nursePatientMap  = new Map();
+
+    function _esc(str) {
+        return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function _maskName(n)  { return n ? n[0] + '●'.repeat(Math.max(n.length-1,1)) : '-'; }
+    function _maskPhone(p) { return p ? p.replace(/(\d{3})-?(\d{3,4})-?(\d{4})/, '$1-****-$3') : '-'; }
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        _currentRole = me.role;
+
+        if (me.role === 'doctor') {
+            document.getElementById('pageDesc').textContent  = '담당 환자 검색 (온프레미스 VPN 경유) — EMR_VIEW 감사 로그 기록';
+            document.getElementById('doctorSearchBar').style.display  = '';
+            document.getElementById('doctorResultTable').style.display = '';
+        } else {
+            document.getElementById('pageDesc').textContent  = '';
+            document.getElementById('nurseSearchBar').style.display  = '';
+            document.getElementById('nurseResultTable').style.display = '';
+            if (['doctor', 'admin'].includes(me.role)) {
+                document.getElementById('doctorSection2').style.display = '';
+            }
+        }
+    }
+
+    // ── 의사 전용 검색 (SFR-018) ──────────────────────────────
+
+    async function doSearch() {
+        const q = document.getElementById('doctorQuery').value.trim();
+        const errEl = document.getElementById('errMsg');
+        errEl.textContent = '';
+        if (!q) { errEl.textContent = '환자명 또는 회원번호를 입력하세요.'; return; }
+
+        const res = await apiCall(`/emr/doctor/patients/search?q=${encodeURIComponent(q)}`);
+        if (!res || !res.ok) {
+            errEl.textContent = res?.status === 503
+                ? '온프레미스 DB에 연결할 수 없습니다.'
+                : '검색에 실패했습니다.';
+            return;
+        }
+        const list = await res.json();
+        renderDoctorResults(list);
+    }
+
+    function renderDoctorResults(list) {
+        const tbody = document.getElementById('doctorBody');
+        if (!list.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">담당 환자 중 검색 결과가 없습니다.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = list.map(p => `
+            <tr>
+                <td style="font-family:monospace;font-size:13px;">${_esc(p.member_number || '-')}</td>
+                <td style="font-weight:700;">${_esc(p.patient_name)}</td>
+                <td>${p.birth_date ? _esc(p.birth_date.slice(0,4)) + '년생' : '-'}</td>
+                <td>${p.gender_code === 'M' ? '남' : p.gender_code === 'F' ? '여' : '-'}</td>
+                <td style="color:#64748b;font-size:13px;">${p.last_visit ? _esc(p.last_visit.slice(0,10)) : '-'}</td>
+                <td>
+                    <button class="btn-emr" onclick="openEmr('${_esc(p.patient_id)}','${_esc(p.patient_name)}')">
+                        <i class="fas fa-file-medical" style="margin-right:4px;"></i>EMR
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function openEmr(patientId, patientName) {
+        _currentPatientId = patientId;
+        document.getElementById('emrModalTitle').textContent = `EMR — ${patientName}`;
+        document.getElementById('emrModalSub').textContent   = '';
+        document.getElementById('emrModalBody').innerHTML    =
+            '<div style="text-align:center;padding:40px;color:#94a3b8;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:12px;">EMR 데이터를 불러오는 중...</p></div>';
+        document.getElementById('emrModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        const res = await apiCall(`/emr/doctor/patients/${patientId}/emr`);
+        if (!res) { renderEmrError('서버에 연결할 수 없습니다.'); return; }
+
+        // 403 = 비담당 환자 → Break-glass 옵션 제공
+        if (res.status === 403) {
+            renderBreakGlassPrompt(patientId, patientName);
+            return;
+        }
+        if (!res.ok) { renderEmrError('EMR을 불러오지 못했습니다.'); return; }
+        const data = await res.json();
+        renderEmrBody(data, false);
+    }
+
+    function renderBreakGlassPrompt(patientId, patientName) {
+        document.getElementById('emrModalBody').innerHTML = `
+            <div style="text-align:center;padding:32px 20px;">
+                <i class="fas fa-lock" style="font-size:40px;color:#ef4444;margin-bottom:16px;display:block;"></i>
+                <h3 style="margin:0 0 8px;font-size:18px;color:#1e293b;">담당 환자가 아닙니다</h3>
+                <p style="color:#64748b;font-size:14px;margin-bottom:24px;">
+                    이 환자의 EMR에 접근하려면 <strong>Break-glass(긴급 접근)</strong>가 필요합니다.<br>
+                    접근 시 온프레미스 감사 로그에 기록되고 관리자에게 알림이 전송됩니다.
+                </p>
+                <button onclick="doBreakGlass('${_esc(patientId)}','${_esc(patientName)}')"
+                        style="padding:10px 24px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
+                    <i class="fas fa-unlock-alt" style="margin-right:6px;"></i>Break-glass 접근
+                </button>
+            </div>`;
+        document.getElementById('startEncounterBtn').style.display = 'none';
+    }
+
+    async function doBreakGlass(patientId, patientName) {
+        document.getElementById('emrModalBody').innerHTML =
+            '<div style="text-align:center;padding:40px;color:#94a3b8;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:12px;">긴급 접근 중...</p></div>';
+
+        const res = await apiCall(`/emr/doctor/patients/${patientId}/break-glass`, { method: 'POST', body: '{}' });
+        if (!res || !res.ok) { renderEmrError('Break-glass 처리에 실패했습니다.'); return; }
+        const data = await res.json();
+        renderEmrBody(data, true);   // break_glass=true
+    }
+
+    function renderEmrBody(data, isBreakGlass) {
+        const p = data.patient || {};
+        const GENDER = { M:'남', F:'여' };
+        document.getElementById('emrModalTitle').textContent = `EMR — ${p.patient_name || '-'}`;
+        document.getElementById('emrModalSub').textContent   =
+            `회원번호: ${p.member_number || '-'} | ${p.birth_date?.slice(0,4) || '?'}년생 | ${GENDER[p.gender_code] || '-'}`;
+        document.getElementById('startEncounterBtn').style.display = '';
+
+        let html = '';
+
+        // Break-glass 배너
+        if (isBreakGlass) {
+            html += `<div class="break-glass-banner">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Break-glass 접근</strong> — 이 조회는 온프레미스 감사 로그(BREAK_GLASS)에 기록되었으며 관리자에게 알림이 전송되었습니다.
+            </div>`;
+        }
+
+        // 알레르기 (최상단 — severity 높은 순)
+        const allergies = data.allergies || [];
+        html += `<div class="emr-section">
+            <div class="emr-section-title"><i class="fas fa-allergies" style="margin-right:5px;"></i>알레르기 (${allergies.length})</div>
+            <div class="allergy-list">`;
+        if (allergies.length) {
+            html += allergies.map(a => `
+                <div class="allergy-item sev-${a.severity_code}">
+                    <span class="sev-badge sev-badge-${a.severity_code}">${_esc(a.severity_code)}</span>
+                    <span style="font-weight:600;">${_esc(a.allergy_name)}</span>
+                    <span style="font-size:12px;color:#94a3b8;">${_esc(a.allergy_code)}</span>
+                </div>`).join('');
+        } else {
+            html += '<p style="color:#94a3b8;font-size:13px;margin:0;">기록된 알레르기 없음</p>';
+        }
+        html += '</div></div>';
+
+        // 내원 이력
+        const encounters = data.encounters || [];
+        html += `<div class="emr-section">
+            <div class="emr-section-title"><i class="fas fa-calendar-check" style="margin-right:5px;"></i>내원 이력 (${encounters.length})</div>`;
+        if (encounters.length) {
+            html += encounters.map(e => {
+                const scls = 'enc-' + (e.status_code || 'open');
+                return `<div class="encounter-item">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:600;">${_esc(e.encounter_type || '-')}</span>
+                        <span class="enc-status-badge ${scls}">${_esc(e.status_code || '-')}</span>
+                    </div>
+                    <div class="enc-meta">${_esc(e.visit_datetime?.replace('T',' ').slice(0,16) || '-')} · ${_esc(e.department_code || '-')}</div>
+                    ${e.chief_complaint ? `<div class="enc-complaint">${_esc(e.chief_complaint)}</div>` : ''}
+                </div>`;
+            }).join('');
+        } else {
+            html += '<p style="color:#94a3b8;font-size:13px;">내원 이력 없음</p>';
+        }
+        html += '</div>';
+
+        // 진단 (diagnosis_text 포함 — 온프레미스 전용)
+        const diagnoses = data.diagnoses || [];
+        html += `<div class="emr-section">
+            <div class="emr-section-title"><i class="fas fa-diagnoses" style="margin-right:5px;"></i>진단 (${diagnoses.length})</div>`;
+        if (diagnoses.length) {
+            html += diagnoses.map(d => `
+                <div class="diagnosis-item">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-weight:700;font-family:monospace;">${_esc(d.diagnosis_code)}</span>
+                        ${d.is_primary ? '<span class="diagnosis-primary">주진단</span>' : ''}
+                        <span style="font-size:11px;color:#94a3b8;">${d.diagnosed_at?.slice(0,10) || ''}</span>
+                    </div>
+                    <div class="diagnosis-text">${_esc(d.diagnosis_text)}</div>
+                </div>`).join('');
+        } else {
+            html += '<p style="color:#94a3b8;font-size:13px;">진단 기록 없음</p>';
+        }
+        html += '</div>';
+
+        // 임상 노트
+        const notes = data.clinical_notes || [];
+        html += `<div class="emr-section">
+            <div class="emr-section-title"><i class="fas fa-notes-medical" style="margin-right:5px;"></i>임상 노트 (${notes.length})</div>`;
+        if (notes.length) {
+            html += notes.map(n => `
+                <div class="note-item">
+                    <div class="note-meta">${_esc(n.created_at?.slice(0,16) || '-')} · ${_esc(n.author_type)} · ${_esc(n.note_type)}</div>
+                    <div class="note-text">${_esc(n.note_text)}</div>
+                </div>`).join('');
+        } else {
+            html += '<p style="color:#94a3b8;font-size:13px;">임상 노트 없음</p>';
+        }
+        html += '</div>';
+
+        // 수술 이력
+        const surgeries = data.surgeries || [];
+        html += `<div class="emr-section">
+            <div class="emr-section-title"><i class="fas fa-procedures" style="margin-right:5px;"></i>수술 이력 (${surgeries.length})</div>`;
+        if (surgeries.length) {
+            html += surgeries.map(s => `
+                <div class="surgery-item">
+                    <span style="font-weight:600;">${_esc(s.surgery_name)}</span>
+                    <span style="font-size:12px;color:#64748b;margin-left:10px;">${_esc(s.surgery_date || '-')} · ${_esc(s.surgery_code)}</span>
+                </div>`).join('');
+        } else {
+            html += '<p style="color:#94a3b8;font-size:13px;">수술 이력 없음</p>';
+        }
+        html += '</div>';
+
+        document.getElementById('emrModalBody').innerHTML = html;
+    }
+
+    function renderEmrError(msg) {
+        document.getElementById('emrModalBody').innerHTML =
+            `<div style="text-align:center;padding:40px;color:#ef4444;">
+                <i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:12px;display:block;"></i>
+                ${_esc(msg)}
+            </div>`;
+        document.getElementById('startEncounterBtn').style.display = 'none';
+    }
+
+    // ── 분할 레이아웃 ─────────────────────────────────────────
+
+    let _splitEmrData = null;   // EMR 데이터 캐시 (분할 뷰 렌더링용)
+
+    async function startEncounter() {
+        if (!_currentPatientId) return;
+
+        // 모달 닫기
+        document.getElementById('emrModal').classList.remove('open');
+        document.body.style.overflow = '';
+
+        // 검색 섹션 숨기기
+        document.getElementById('searchSection').style.display = 'none';
+
+        // 환자 정보 헤더 설정
+        const title  = document.getElementById('emrModalTitle').textContent.replace('EMR — ', '');
+        const sub    = document.getElementById('emrModalSub').textContent;
+        document.getElementById('splitPatientName').textContent = title;
+        document.getElementById('splitPatientSub').textContent  = sub;
+
+        // EMR 데이터를 분할 뷰 왼쪽 패널에 렌더링
+        document.getElementById('splitEmrContent').innerHTML =
+            document.getElementById('emrModalBody').innerHTML;
+
+        // 진료과 목록 로드
+        await loadDepartments();
+
+        // 폼 초기화
+        document.getElementById('encounterForm').reset();
+        document.getElementById('saveMsg').textContent = '';
+        document.getElementById('submitBtn').disabled = false;
+
+        // 분할 뷰 표시
+        document.getElementById('splitView').style.display = '';
+        document.getElementById('startEncounterBtn').style.display = '';
+    }
+
+    function closeEmrModal() {
+        document.getElementById('emrModal').classList.remove('open');
+        document.body.style.overflow = '';
+        _currentPatientId = null;
+        document.getElementById('startEncounterBtn').style.display = '';
+    }
+
+    function backToSearch() {
+        document.getElementById('splitView').style.display = 'none';
+        document.getElementById('searchSection').style.display = '';
+        _currentPatientId = null;
+    }
+
+    async function loadDepartments() {
+        const select = document.getElementById('fDept');
+        if (select.options.length > 1) return;  // 이미 로드됨
+        try {
+            const res = await apiCall('/emr/departments');
+            if (!res || !res.ok) return;
+            const depts = await res.json();
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.department_code;
+                opt.textContent = d.department_name || d.department_code;
+                select.appendChild(opt);
+            });
+        } catch {}
+    }
+
+    async function submitEncounter(event) {
+        event.preventDefault();
+        if (!_currentPatientId) return;
+
+        const btn    = document.getElementById('submitBtn');
+        const msgEl  = document.getElementById('saveMsg');
+        const encType = document.getElementById('fEncType').value;
+        const dept    = document.getElementById('fDept').value;
+
+        if (!encType || !dept) {
+            msgEl.style.color = '#ef4444';
+            msgEl.textContent = '진료 유형과 진료과를 선택해 주세요.';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '저장 중...';
+        msgEl.textContent = '';
+
+        try {
+            // 1. 진료(encounter) 생성
+            const encRes = await apiCall('/emr/encounters', {
+                method: 'POST',
+                body: JSON.stringify({
+                    patient_id:      _currentPatientId,
+                    encounter_type:  encType,
+                    department_code: dept,
+                    chief_complaint: document.getElementById('fComplaint').value.trim() || null,
+                }),
+            });
+            if (!encRes || !encRes.ok) throw new Error('진료 생성 실패');
+            const { encounter_id } = await encRes.json();
+
+            // 2. 진단 입력 (선택)
+            const diagCode = document.getElementById('fDiagCode').value.trim();
+            const diagText = document.getElementById('fDiagText').value.trim();
+            if (diagCode && diagText) {
+                const diagRes = await apiCall(`/emr/patients/${_currentPatientId}/diagnoses`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        encounter_id:   encounter_id,
+                        diagnosis_code: diagCode,
+                        diagnosis_text: diagText,
+                        is_primary:     document.getElementById('fIsPrimary').checked,
+                    }),
+                });
+                if (!diagRes || !diagRes.ok) console.warn('진단 저장 실패');
+            }
+
+            // 3. 임상 노트 입력 (선택)
+            const noteText = document.getElementById('fNoteText').value.trim();
+            if (noteText) {
+                const noteRes = await apiCall(`/emr/patients/${_currentPatientId}/clinical-notes`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        encounter_id: encounter_id,
+                        note_type:    '진료노트',
+                        note_text:    noteText,
+                    }),
+                });
+                if (!noteRes || !noteRes.ok) console.warn('임상 노트 저장 실패');
+            }
+
+            msgEl.style.color   = '#059669';
+            msgEl.textContent   = '✓ 진료가 저장되었습니다.';
+            btn.textContent     = '저장 완료';
+            btn.style.background = '#d1fae5';
+            btn.style.color      = '#065f46';
+
+        } catch (err) {
+            msgEl.style.color = '#ef4444';
+            msgEl.textContent = err.message || '저장에 실패했습니다.';
+            btn.disabled = false;
+            btn.textContent = '진료 완료 저장';
+        }
+    }
+
+    // ── 간호사/관리자 검색 (SFR-026: 이름 또는 회원번호) ────────
+
+    async function doNurseSearch() {
+        const q = document.getElementById('nurseQuery').value.trim();
+        const errEl = document.getElementById('errMsg');
+        errEl.textContent = '';
+        if (!q) { errEl.textContent = '환자 이름 또는 회원번호를 입력하세요.'; return; }
+
+        const res = await apiCall(`/emr/nurse/patients/search?q=${encodeURIComponent(q)}`);
+        if (!res || !res.ok) {
+            errEl.textContent = res?.status === 503
+                ? '온프레미스 DB에 연결할 수 없습니다.' : '조회 실패. 권한을 확인하거나 다시 시도하세요.';
+            return;
+        }
+        const data = await res.json();
+        renderNurseList(data.items || []);
+    }
+
+    function renderNurseList(items) {
+        const GENDER = { M: '남', F: '여' };
+        const tbody = document.getElementById('nurseBody');
+        _nursePatientMap.clear();
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">검색 결과가 없습니다.</td></tr>';
+            return;
+        }
+        items.forEach(p => _nursePatientMap.set(p.patient_id, p));
+        tbody.innerHTML = items.map(p => `
+            <tr>
+                <td style="font-family:monospace;font-size:13px;font-weight:700;">${_esc(p.member_number || '-')}</td>
+                <td style="font-weight:600;">${_esc(p.patient_name)}</td>
+                <td>${p.birth_date ? _esc(p.birth_date.slice(0,4)) + '년생' : '-'}</td>
+                <td>${GENDER[p.gender_code] || '-'}</td>
+                <td style="color:#64748b;font-size:12px;">${p.last_visit ? _esc(p.last_visit.slice(0,10)) : '-'}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn-emr" data-pid="${_esc(p.patient_id)}" data-hash="${_esc(p.patient_id_hash||'')}" onclick="openNurseDetail(this.dataset.pid)">
+                        <i class="fas fa-folder-open" style="margin-right:4px;"></i>상세
+                    </button>
+                    <a href="nurse-appointment-new.html" onclick="goAppt('${_esc(p.patient_id_hash||'')}');return false;"
+                       style="margin-left:4px;padding:5px 10px;background:#dbeafe;color:#1e40af;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;">
+                        예약
+                    </a>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function goAppt(patientHash) {
+        if (!patientHash) { alert('patient_id_hash가 없습니다.'); return; }
+        sessionStorage.setItem('appt_patient_hash', patientHash);
+        loadPage('nurse-appointment-new.html');
+    }
+
+    async function openNurseDetail(patientId) {
+        const res = await apiCall(`/emr/patients/${patientId}`);
+        if (!res || !res.ok) { alert('상세 정보를 불러올 수 없습니다.'); return; }
+        const p = await res.json();
+        document.getElementById('nurseModalTitle').textContent = `환자 상세 — ${p.patient_name || '-'}`;
+        document.getElementById('auditTs').textContent  = new Date().toLocaleString('ko-KR');
+        document.getElementById('dName').textContent    = p.patient_name || '-';
+        document.getElementById('dBirth').textContent   = p.birth_date ? p.birth_date.slice(0,4) + '년생' : '-';
+        document.getElementById('dGender').textContent  = p.gender_code === 'M' ? '남' : p.gender_code === 'F' ? '여' : '-';
+        document.getElementById('dPhone').textContent   = p.phone_number || '-';
+
+        const encRes  = await apiCall(`/emr/patients/${patientId}/encounters`);
+        const encList = encRes?.ok ? await encRes.json() : [];
+        document.getElementById('dEncounters').innerHTML = encList.length
+            ? encList.map(e => `<li>${_esc(e.visit_datetime?.slice(0,10)||'-')} · ${_esc(e.department_code||'-')} · ${_esc(e.encounter_type||'-')} · ${_esc(e.status_code||'-')}</li>`).join('')
+            : '<li>없음</li>';
+
+        // 입원 중(inpatient + admitted) 인 encounter 확인 → 퇴원 버튼 표시
+        const admittedEnc = encList.find(e =>
+            e.encounter_type === 'inpatient' && e.status_code === 'admitted'
+        );
+        const dischargeArea = document.getElementById('dischargeArea');
+        if (admittedEnc && dischargeArea) {
+            dischargeArea.style.display = '';
+            dischargeArea.dataset.encounterId = admittedEnc.encounter_id;
+        } else if (dischargeArea) {
+            dischargeArea.style.display = 'none';
+        }
+
+        const algRes  = await apiCall(`/emr/patients/${patientId}/allergies`);
+        const algList = algRes?.ok ? await algRes.json() : [];
+        document.getElementById('dAllergies').innerHTML = algList.length
+            ? algList.map(a => `<li>${_esc(a.allergy_name||'-')} (${_esc(a.severity_code||'-')})</li>`).join('')
+            : '<li>없음</li>';
+
+        if (['admin'].includes(_currentRole)) {
+            const diagRes  = await apiCall(`/emr/patients/${patientId}/diagnoses`);
+            const diagList = diagRes?.ok ? await diagRes.json() : [];
+            document.getElementById('dDiagnoses').innerHTML = diagList.length
+                ? diagList.map(d => `<li>${_esc(d.diagnosis_code)}${d.is_primary ? ' <strong>(주)</strong>':''}</li>`).join('')
+                : '<li>없음</li>';
+            const surgRes  = await apiCall(`/emr/patients/${patientId}/surgery-histories`);
+            const surgList = surgRes?.ok ? await surgRes.json() : [];
+            document.getElementById('dSurgeries').innerHTML = surgList.length
+                ? surgList.map(s => `<li>${_esc(s.surgery_date||'-')} · ${_esc(s.surgery_name||'-')}</li>`).join('')
+                : '<li>없음</li>';
+        }
+
+        document.getElementById('nurseDetailModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    async function doDischarge() {
+        const area       = document.getElementById('dischargeArea');
+        const encounterId = area?.dataset.encounterId;
+        if (!encounterId) { alert('encounter_id를 찾을 수 없습니다.'); return; }
+        if (!confirm('퇴원 처리하시겠습니까?\n온프레미스 진료 상태와 병동 병상이 동시에 업데이트됩니다.')) return;
+
+        const res = await apiCall(`/emr/nurse/encounters/${encounterId}/discharge`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+        if (res && res.ok) {
+            area.style.display = 'none';
+            area.innerHTML = '<div style="color:#059669;font-size:13px;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:5px;"></i>퇴원 처리 완료</div>';
+            area.style.display = '';
+            area.style.background = '#f0fdf4';
+            area.style.borderColor = '#86efac';
+        } else {
+            const err = await res?.json().catch(() => ({}));
+            alert(err.detail || '퇴원 처리 중 오류가 발생했습니다.');
+        }
+    }
+
+    function closeNurseModal() {
+        document.getElementById('nurseDetailModal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    // 엔터 키 지원
+    document.addEventListener('DOMContentLoaded', () => {
+        const dq = document.getElementById('doctorQuery');
+        if (dq) dq.addEventListener('keypress', e => { if (e.key === 'Enter') doSearch(); });
+        const nq = document.getElementById('nurseQuery');
+        if (nq) nq.addEventListener('keypress', e => { if (e.key === 'Enter') doNurseSearch(); });
+    });
+
+    init();
+</script>
+</body>
+</html>

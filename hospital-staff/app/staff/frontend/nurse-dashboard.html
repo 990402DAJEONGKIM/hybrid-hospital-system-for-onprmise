@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>예약 현황 관리 - MZ Clinic 원무과</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1200px; margin:80px auto 40px; padding:0 16px; }
+        .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+        .toolbar label { font-size:13px; color:#546e7a; font-weight:600; }
+        .toolbar input[type="date"],
+        .toolbar select { padding:8px 10px; border:1px solid #cfd8dc; border-radius:6px; font-size:13px; }
+        .toolbar button { padding:8px 16px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+        .toolbar .btn-reset { background:#eceff1; color:#546e7a; }
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .data-table th { background:#eceff1; padding:10px 12px; text-align:left; font-weight:600; color:#546e7a; border-bottom:2px solid #cfd8dc; }
+        .data-table td { padding:9px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+        .data-table tr:hover td { background:#f5f5f5; }
+        .status-badge { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
+        .status-pending   { background:#fff8e1; color:#f57f17; }
+        .status-confirmed { background:#e8f5e9; color:#2e7d32; }
+        .status-cancelled { background:#ffebee; color:#c62828; }
+        .status-completed { background:#e3f2fd; color:#1565c0; }
+        .status-no_show   { background:#f3e5f5; color:#6a1b9a; }
+        .type-badge { padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+        .type-PRE_OP   { background:#fff3e0; color:#e65100; border:1px solid #ffcc02; }
+        .type-normal   { background:#f3f4f6; color:#374151; }
+        .action-btns { display:flex; gap:5px; flex-wrap:wrap; }
+        .btn-xs { padding:4px 9px; border:none; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; }
+        .btn-confirm  { background:#e8f5e9; color:#2e7d32; }
+        .btn-complete { background:#e3f2fd; color:#1565c0; }
+        .btn-noshow   { background:#f3e5f5; color:#6a1b9a; }
+        .btn-cancel   { background:#ffebee; color:#c62828; }
+        .btn-hist     { background:#f1f5f9; color:#475569; }
+        .btn-checkin  { background:#dcfce7; color:#166534; }
+        .empty-msg { text-align:center; padding:40px; color:#90a4ae; }
+        #errMsg { color:#e53935; font-size:13px; margin-bottom:10px; min-height:18px; }
+        .new-btn { padding:8px 16px; background:#059669; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+
+        /* 이력 모달 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; align-items:center; justify-content:center; }
+        .modal-overlay.open { display:flex; }
+        .modal-box { background:#fff; border-radius:12px; padding:0; max-width:640px; width:100%; max-height:85vh; overflow:hidden; display:flex; flex-direction:column; }
+        .modal-header { padding:18px 22px 14px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+        .modal-header h3 { margin:0; font-size:16px; font-weight:800; color:#1e293b; }
+        .modal-body { overflow-y:auto; padding:18px 22px; flex:1; }
+        .modal-footer { padding:12px 22px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end; background:#f8fafc; }
+        .modal-close { background:none; border:none; font-size:18px; cursor:pointer; color:#78909c; }
+        .hist-item { padding:10px 14px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; font-size:13px; }
+        .hist-meta { font-size:11px; color:#94a3b8; margin-bottom:4px; }
+        .hist-status { display:flex; align-items:center; gap:8px; }
+
+        /* 취소 확인 모달 */
+        .cancel-form label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; margin-top:12px; }
+        .cancel-form input, .cancel-form select, .cancel-form textarea {
+            width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; box-sizing:border-box;
+        }
+        .cancel-form textarea { height:70px; resize:vertical; }
+        .err-inline { color:#e53935; font-size:12px; margin-top:6px; display:none; }
+        .btn-do-cancel { padding:9px 20px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:700; cursor:pointer; }
+        .btn-close-m { padding:9px 20px; background:#e2e8f0; color:#374151; border:none; border-radius:6px; font-size:14px; cursor:pointer; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+
+<!-- 이력 모달 -->
+<div class="modal-overlay" id="histModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-history" style="margin-right:6px;color:#6366f1;"></i>예약 변경 이력</h3>
+            <button class="modal-close" onclick="closeHistModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="histBody">
+            <div class="empty-msg"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-close-m" onclick="closeHistModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 취소 확인 모달 -->
+<div class="modal-overlay" id="cancelModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-times-circle" style="margin-right:6px;color:#ef4444;"></i>예약 취소 처리</h3>
+            <button class="modal-close" onclick="closeCancelModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:13px;color:#374151;margin-bottom:8px;">
+                취소 전 본인 확인이 필요합니다. 환자의 회원번호 또는 생년월일(YYYY-MM-DD)을 입력하세요.
+            </p>
+            <div class="cancel-form">
+                <label>확인 방법</label>
+                <select id="verifyType">
+                    <option value="member_number">회원번호</option>
+                    <option value="birth_date">생년월일</option>
+                </select>
+                <label>입력값</label>
+                <input type="text" id="verifyValue" placeholder="회원번호 또는 생년월일(YYYY-MM-DD)">
+                <label>취소 사유 <span style="color:#e53935;">*</span></label>
+                <textarea id="cancelReason" placeholder="취소 사유를 입력하세요."></textarea>
+                <div class="err-inline" id="cancelErr"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-do-cancel" onclick="doCancel()"><i class="fas fa-times-circle" style="margin-right:5px;"></i>취소 처리</button>
+            <button class="btn-close-m" onclick="closeCancelModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<div class="page-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <h2 style="margin:0;">예약 현황 관리</h2>
+        <a class="new-btn" href="nurse-appointment-new.html" onclick="loadPage('nurse-appointment-new.html');return false;">
+            <i class="fas fa-plus"></i> 접수
+        </a>
+    </div>
+    <p style="color:#78909c;font-size:13px;margin-bottom:18px;">날짜·상태·유형·진료과별로 예약을 조회하고 처리합니다.</p>
+
+    <div class="toolbar">
+        <label>날짜</label>
+        <input type="date" id="searchDate">
+        <label>상태</label>
+        <select id="statusFilter">
+            <option value="">전체</option>
+            <option value="pending">대기</option>
+            <option value="confirmed">확정</option>
+            <option value="completed">완료</option>
+            <option value="no_show">미내원</option>
+            <option value="cancelled">취소</option>
+        </select>
+        <label>유형</label>
+        <select id="typeFilter">
+            <option value="">전체</option>
+        </select>
+        <label>진료과</label>
+        <select id="deptFilter">
+            <option value="">전체</option>
+        </select>
+        <button onclick="load()"><i class="fas fa-search" style="margin-right:4px;"></i>조회</button>
+        <button class="btn-reset" onclick="resetFilters()">초기화</button>
+    </div>
+
+    <div id="errMsg"></div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>예약일시</th>
+                <th>유형</th>
+                <th>진료과</th>
+                <th>담당의</th>
+                <th>환자명</th>
+                <th>상태</th>
+                <th>처리</th>
+            </tr>
+        </thead>
+        <tbody id="apptBody"></tbody>
+    </table>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    const STATUS_LBL = {
+        pending:'대기', confirmed:'확정', cancelled:'취소', completed:'완료', no_show:'미내원',
+    };
+    const STATUS_CLS = {
+        pending:'status-pending', confirmed:'status-confirmed', cancelled:'status-cancelled',
+        completed:'status-completed', no_show:'status-no_show',
+    };
+
+    let deptMap = {};
+    let doctorMap = {};
+    let _cancelApptId = null;
+    let _cancelPatientHash = null;
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        document.getElementById('searchDate').value = new Date().toISOString().split('T')[0];
+
+        // 진료과 로드
+        const dr = await apiCall('/portal/doctor/staff/departments');
+        if (dr && dr.ok) {
+            const depts = await dr.json();
+            const deptSel = document.getElementById('deptFilter');
+            depts.forEach(d => {
+                deptMap[d.department_code] = d.department_name;
+                const opt = document.createElement('option');
+                opt.value = d.department_code;
+                opt.textContent = d.department_name;
+                deptSel.appendChild(opt);
+            });
+        }
+
+        // 의사 목록 로드
+        const docr = await apiCall('/portal/doctor/staff/doctors');
+        if (docr && docr.ok) {
+            const docs = await docr.json();
+            docs.forEach(d => { doctorMap[d.doctor_id] = d.doctor_name; });
+        }
+
+        // 예약 유형 로드
+        const tr = await apiCall('/portal/doctor/appointment-types');
+        if (tr && tr.ok) {
+            const types = await tr.json();
+            const typeSel = document.getElementById('typeFilter');
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.type_code;
+                opt.textContent = t.type_name;
+                typeSel.appendChild(opt);
+            });
+        }
+
+        await load();
+    }
+
+    function resetFilters() {
+        document.getElementById('searchDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('deptFilter').value = '';
+        load();
+    }
+
+    // hash → 환자명 캐시 (페이지 세션 내 재사용)
+    let _nameCache = {};
+
+    async function load() {
+        const date   = document.getElementById('searchDate').value;
+        const status = document.getElementById('statusFilter').value;
+        const type   = document.getElementById('typeFilter').value;
+        const dept   = document.getElementById('deptFilter').value;
+
+        let path = '/portal/doctor/staff/appointments';
+        const params = [];
+        if (date)   params.push(`appt_date=${date}`);
+        if (status) params.push(`status_code=${status}`);
+        if (params.length) path += '?' + params.join('&');
+
+        const res = await apiCall(path);
+        if (!res || !res.ok) {
+            document.getElementById('errMsg').textContent = '예약 목록을 불러오지 못했습니다.';
+            return;
+        }
+        document.getElementById('errMsg').textContent = '';
+        let list = await res.json();
+
+        // 클라이언트 필터
+        if (type) list = list.filter(a => a.type_code === type);
+        if (dept) list = list.filter(a => a.department_code === dept);
+
+        // 캐시에 없는 hash만 추려서 온프레미스 일괄 조회
+        const uncached = [...new Set(
+            list.map(a => a.patient_id_hash).filter(h => h && !_nameCache[h])
+        )];
+        if (uncached.length) {
+            try {
+                const nr = await apiCall('/emr/nurse/patients/names-by-hashes', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ hashes: uncached }),
+                });
+                if (nr && nr.ok) {
+                    const names = await nr.json();
+                    Object.assign(_nameCache, names);
+                }
+            } catch {}
+        }
+
+        renderTable(list);
+    }
+
+    function renderTable(list) {
+        const tbody = document.getElementById('apptBody');
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">조회된 예약이 없습니다.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = list.map(a => {
+            const dept      = deptMap[a.department_code] || a.department_code || '-';
+            const statusLbl = STATUS_LBL[a.status_code] || a.status_name || '-';
+            const statusCls = STATUS_CLS[a.status_code] || '';
+            const isPreOp   = a.type_code === 'PRE_OP';
+            const typeBadge = `<span class="type-badge ${isPreOp ? 'type-PRE_OP' : 'type-normal'}">${_esc(a.type_name || a.type_code || '-')}${isPreOp ? ' ⚠' : ''}</span>`;
+            const patientName = _nameCache[a.patient_id_hash] || '—';
+            const doctorName = doctorMap[a.doctor_id] || '-';
+            const actions   = buildActions(a);
+            return `
+            <tr>
+                <td>${_esc(a.appointment_date)} ${_esc(a.appointment_time || '')}</td>
+                <td>${typeBadge}</td>
+                <td>${_esc(dept)}</td>
+                <td>${_esc(doctorName)}</td>
+                <td style="font-weight:600;">${_esc(patientName)}</td>
+                <td><span class="status-badge ${statusCls}">${_esc(statusLbl)}</span></td>
+                <td><div class="action-btns">${actions}</div></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function _esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function buildActions(a) {
+        let btns = `<button class="btn-xs btn-hist" onclick="openHist('${a.appointment_id}')"><i class="fas fa-history"></i></button>`;
+        if (a.status_code === 'pending') {
+            btns += `<button class="btn-xs btn-confirm" onclick="updateStatus('${a.appointment_id}','confirmed',null,'${a.patient_id_hash}')">확정</button>
+                     <button class="btn-xs btn-cancel" onclick="openCancelModal('${a.appointment_id}','${a.patient_id_hash}')">취소</button>`;
+        } else if (a.status_code === 'confirmed') {
+            btns += `<button class="btn-xs btn-complete" onclick="updateStatus('${a.appointment_id}','completed',null,'${a.patient_id_hash}')">완료</button>
+                     <button class="btn-xs btn-noshow" onclick="updateStatus('${a.appointment_id}','no_show',null,'${a.patient_id_hash}')">미내원</button>
+                     <button class="btn-xs btn-cancel" onclick="openCancelModal('${a.appointment_id}','${a.patient_id_hash}')">취소</button>`;
+        }
+        return btns;
+    }
+
+    async function updateStatus(id, code, reason, patientHash) {
+        const labels = { confirmed:'확정', completed:'완료', no_show:'미내원', cancelled:'취소' };
+        if (!confirm(`예약을 "${labels[code]}" 처리하시겠습니까?`)) return;
+
+        const res = await apiCall(`/portal/doctor/staff/appointments/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status_code: code, reason: reason || null }),
+        });
+        if (res && res.ok) {
+            await load();
+        } else {
+            const err = await res?.json().catch(() => ({}));
+            document.getElementById('errMsg').textContent = err.detail || '처리 중 오류가 발생했습니다.';
+        }
+    }
+
+    // ── 예약 이력 모달 ─────────────────────────────────────────
+
+    async function openHist(apptId) {
+        document.getElementById('histBody').innerHTML = '<div class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 이력 조회 중...</div>';
+        document.getElementById('histModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        const res = await apiCall(`/portal/doctor/staff/appointments/${apptId}/history`);
+        if (!res || !res.ok) {
+            document.getElementById('histBody').innerHTML = '<div class="empty-msg">이력을 불러오지 못했습니다.</div>';
+            return;
+        }
+        const list = await res.json();
+        if (!list.length) {
+            document.getElementById('histBody').innerHTML = '<div class="empty-msg">변경 이력이 없습니다.</div>';
+            return;
+        }
+        document.getElementById('histBody').innerHTML = list.map(h => `
+            <div class="hist-item">
+                <div class="hist-meta">${_esc(h.changed_at ? h.changed_at.replace('T',' ').slice(0,16) : '-')}</div>
+                <div class="hist-status">
+                    <span style="color:#94a3b8;">${_esc(h.prev_status || '-')}</span>
+                    <i class="fas fa-arrow-right" style="color:#cbd5e1;"></i>
+                    <span style="font-weight:700;color:#1e293b;">${_esc(h.new_status || '-')}</span>
+                    ${h.new_date ? `<span style="font-size:11px;color:#64748b;">(${_esc(h.new_date)} ${_esc(h.new_time||'')})</span>` : ''}
+                </div>
+                ${h.change_reason ? `<div style="margin-top:4px;font-size:12px;color:#64748b;">사유: ${_esc(h.change_reason)}</div>` : ''}
+            </div>`).join('');
+    }
+
+    function closeHistModal() {
+        document.getElementById('histModal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    // ── 취소 확인 모달 ─────────────────────────────────────────
+
+    function openCancelModal(apptId, patientHash) {
+        _cancelApptId = apptId;
+        _cancelPatientHash = patientHash;
+        document.getElementById('verifyValue').value = '';
+        document.getElementById('cancelReason').value = '';
+        document.getElementById('cancelErr').style.display = 'none';
+        document.getElementById('cancelModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCancelModal() {
+        document.getElementById('cancelModal').classList.remove('open');
+        document.body.style.overflow = '';
+        _cancelApptId = null;
+        _cancelPatientHash = null;
+    }
+
+    async function doCancel() {
+        const verifyType  = document.getElementById('verifyType').value;
+        const verifyValue = document.getElementById('verifyValue').value.trim();
+        const reason      = document.getElementById('cancelReason').value.trim();
+        const errEl       = document.getElementById('cancelErr');
+
+        if (!verifyValue) { showCancelErr('확인값을 입력하세요.'); return; }
+        if (!reason)      { showCancelErr('취소 사유를 입력하세요.'); return; }
+
+        // 본인 확인: 온프레미스에서 환자 최소 정보 조회 후 비교
+        if (_cancelPatientHash) {
+            const vRes = await apiCall(`/emr/nurse/patients/${_cancelPatientHash}/verify`);
+            if (!vRes || !vRes.ok) { showCancelErr('환자 정보 확인에 실패했습니다.'); return; }
+            const v = await vRes.json();
+            let match = false;
+            if (verifyType === 'member_number') match = v.member_number === verifyValue;
+            else match = v.birth_date === verifyValue;
+            if (!match) { showCancelErr('입력값이 환자 정보와 일치하지 않습니다. 취소를 중단합니다.'); return; }
+        }
+
+        // closeCancelModal() 전에 ID를 로컬 변수로 저장 (closeCancelModal이 null로 초기화하므로)
+        const apptId     = _cancelApptId;
+        const patientHash = _cancelPatientHash;
+        closeCancelModal();
+        await updateStatus(apptId, 'cancelled', reason, patientHash);
+    }
+
+    function showCancelErr(msg) {
+        const el = document.getElementById('cancelErr');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    init();
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>김이박 클리닉 - 의료진 포털</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .dash-welcome {
+            display:flex; flex-direction:column; align-items:center;
+            justify-content:center; height:100%; min-height:360px;
+            text-align:center; padding:40px 24px;
+        }
+        .dash-icon-wrap {
+            width:72px; height:72px; border-radius:18px;
+            display:flex; align-items:center; justify-content:center;
+            margin-bottom:20px;
+        }
+        .dash-icon-wrap i { font-size:30px; }
+
+        .pw-banner { display:none; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:12px 18px; margin-bottom:20px; font-size:13px; color:#92400e; align-items:center; gap:10px; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+    <div id="pwBanner" class="pw-banner">
+        <i class="fas fa-exclamation-triangle"></i>
+        비밀번호가 만료되었습니다.
+        <a href="change-password.html" style="margin-left:auto;font-weight:700;text-decoration:underline;">지금 변경하기</a>
+    </div>
+    <div id="dashboardContent"></div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const me = await initLayout();
+    if (!me) return;
+
+    if (me.password_expired) {
+        const b = document.getElementById('pwBanner');
+        if (b) b.style.display = 'flex';
+    }
+
+    if (me.role === 'nurse') {
+        loadPage('nurse-dashboard.html');
+        return;
+    }
+    if (me.role === 'admin') {
+        loadPage('admin-users.html');
+        return;
+    }
+    if (me.role === 'doctor') {
+        loadPage('doctor-schedule.html');
+        return;
+    }
+    renderGenericDashboard(me);
+});
+
+// ── 일반 역할 대시보드 ───────────────────────────────────────
+
+function renderGenericDashboard(me) {
+    const roleLabel  = _ROLE_LABELS[me.role]  || me.role;
+    const roleColor  = _ROLE_COLORS[me.role]  || '#1e88e5';
+    const roleBg     = _ROLE_BG[me.role]      || '#e3f2fd';
+    const shortcuts  = _SHORTCUTS[me.role]    || [];
+
+    document.getElementById('dashboardContent').innerHTML = `
+        <div class="dash-welcome">
+            <div class="dash-icon-wrap" style="background:${roleBg};">
+                <i class="fas fa-hospital-alt" style="color:${roleColor};"></i>
+            </div>
+            <h1 style="font-size:22px;font-weight:800;color:#1e293b;margin:0 0 8px;">
+                ${roleLabel} 포털
+            </h1>
+            <p style="font-size:14px;color:#64748b;margin:0 0 4px;">
+                <strong style="color:#1e293b;">${me.member_number}</strong> 님, 환영합니다.
+            </p>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:420px;">
+                ${shortcuts.map(s => `
+                    <a href="${s.url}" onclick="loadPage('${s.url}');return false;"
+                       class="sc-btn" style="border-color:${s.color};">
+                        <i class="fas fa-${s.icon}" style="color:${s.color};font-size:12px;"></i>
+                        ${s.label}
+                    </a>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+</script>
+</body>
+</html>

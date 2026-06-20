@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>접수 - MZ Clinic 원무과</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:680px; margin:80px auto 40px; padding:0 16px; }
+        .back-link { font-size:13px; color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-bottom:16px; }
+        .back-link:hover { text-decoration:underline; }
+        .card { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:28px; margin-bottom:16px; }
+        .card-title { font-size:15px; font-weight:700; color:#1e293b; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+        .form-group { margin-bottom:16px; }
+        .form-group label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; }
+        .form-group input,
+        .form-group select,
+        .form-group textarea { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; box-sizing:border-box; background:#f9fafb; transition:border-color .15s; }
+        .form-group input:focus,
+        .form-group select:focus { border-color:#0ea5e9; background:#fff; outline:none; }
+        .form-group .hint { font-size:11px; color:#94a3b8; margin-top:4px; }
+        .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .btn-primary { width:100%; padding:12px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; }
+        .btn-primary:hover { background:#047857; }
+        .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+        .err-box { background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:10px 14px; font-size:13px; color:#991b1b; margin-bottom:14px; display:none; }
+        .ok-box  { background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:10px 14px; font-size:13px; color:#166534; margin-bottom:14px; display:none; }
+        .isms-notice { background:#fff8e1; border:1px solid #f59e0b; border-radius:6px; padding:10px 16px; font-size:12px; color:#92400e; margin-bottom:18px; }
+        .pre-op-notice { background:#fff3e0; border:1px solid #fb923c; border-radius:6px; padding:10px 14px; font-size:12px; color:#c2410c; margin-bottom:14px; display:none; }
+        .pre-op-notice i { margin-right:5px; }
+        /* 환자 확인 섹션 */
+        .patient-box { background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:14px 18px; margin-top:8px; font-size:13px; display:none; }
+        .patient-box .p-row { display:flex; gap:20px; flex-wrap:wrap; margin-top:4px; }
+        .patient-box .p-item { color:#374151; }
+        .patient-box .p-label { font-size:11px; color:#94a3b8; font-weight:600; margin-bottom:2px; }
+        /* 접수 정보 섹션 */
+        .reception-info { margin-top:10px; border-top:1px solid #bbf7d0; padding-top:10px; display:none; }
+        .reception-info .ri-title { font-size:11px; font-weight:700; color:#94a3b8; margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em; }
+        .reception-info .ri-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
+        .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+        .badge-diag { background:#e0f2fe; color:#0369a1; }
+        .badge-diag.sensitive { background:#fef3c7; color:#92400e; }
+        .badge-allergy { background:#fee2e2; color:#991b1b; }
+        .badge-dept { background:#ede9fe; color:#5b21b6; }
+        .search-row { display:flex; gap:8px; }
+        .search-row input { flex:1; }
+        .btn-search { padding:9px 16px; background:#0ea5e9; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+        .btn-search:hover { background:#0284c7; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <h2 style="margin-bottom:4px;">접수</h2>
+
+    <!-- 환자 조회 -->
+    <div class="card">
+        <div class="card-title"><i class="fas fa-user-check" style="color:#0ea5e9;"></i>환자 조회</div>
+        <div class="form-group">
+            <label>회원번호 또는 환자 이름으로 조회 <span style="color:#e53935;">*</span></label>
+            <div class="search-row">
+                <input type="text" id="patientQuery" placeholder="회원번호 또는 환자 이름">
+                <button class="btn-search" onclick="searchPatient()"><i class="fas fa-search" style="margin-right:4px;"></i>조회</button>
+            </div>
+        </div>
+
+        <!-- 검색 결과 목록 -->
+        <div id="searchResultBox" style="display:none;margin-top:4px;border:1px solid #d1d5db;border-radius:6px;overflow:hidden;"></div>
+
+        <!-- 선택된 환자 확인 카드 -->
+        <div class="patient-box" id="patientBox">
+            <div style="font-weight:700;margin-bottom:6px;color:#166534;display:flex;justify-content:space-between;align-items:center;">
+                <span><i class="fas fa-check-circle" style="margin-right:5px;"></i>환자 선택 완료</span>
+                <button onclick="clearPatient()" style="background:none;border:none;color:#94a3b8;font-size:11px;cursor:pointer;">다시 조회</button>
+            </div>
+            <div class="p-row">
+                <div class="p-item"><div class="p-label">회원번호</div><div id="pMember">—</div></div>
+                <div class="p-item"><div class="p-label">이름</div><div id="pName">—</div></div>
+                <div class="p-item"><div class="p-label">생년</div><div id="pBirth">—</div></div>
+                <div class="p-item"><div class="p-label">성별</div><div id="pGender">—</div></div>
+            </div>
+            <!-- 접수 참고 정보 (방향 A) -->
+            <div class="reception-info" id="receptionInfo">
+                <div id="riDiag" style="margin-bottom:6px;">
+                    <div class="ri-title">진단 코드 (접수 참고용)</div>
+                    <div class="ri-row" id="riDiagList"></div>
+                </div>
+                <div id="riAllergy" style="margin-bottom:2px;">
+                    <div class="ri-title">알레르기</div>
+                    <div class="ri-row" id="riAllergyList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 예약 정보 -->
+    <div class="card">
+        <div class="card-title"><i class="fas fa-calendar-plus" style="color:#059669;"></i>예약 정보</div>
+
+        <div id="errBox" class="err-box"></div>
+        <div id="okBox"  class="ok-box"></div>
+        <div class="pre-op-notice" id="preOpNotice">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>수술 전 예약</strong>: 수술 전 검사 일정은 별도 안내가 필요합니다. 수술 이력·알레르기 정보는 예약 단계에서 수집하지 않습니다.
+        </div>
+
+        <form id="apptForm" onsubmit="submitAppt(event)">
+            <div class="form-group">
+                <label>예약 유형 <span style="color:#e53935;">*</span></label>
+                <select id="typeCode" required onchange="onTypeChange()">
+                    <option value="">선택하세요</option>
+                </select>
+            </div>
+
+            <div class="row2">
+                <div class="form-group">
+                    <label>진료과 <span style="color:#e53935;">*</span></label>
+                    <select id="deptCode" required onchange="loadDoctors()">
+                        <option value="">선택하세요</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>담당 의사 <span style="color:#e53935;">*</span></label>
+                    <select id="doctorId" required>
+                        <option value="">진료과 선택 후</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row2">
+                <div class="form-group">
+                    <label>예약 날짜 <span style="color:#e53935;">*</span></label>
+                    <input type="date" id="apptDate" required>
+                </div>
+                <div class="form-group">
+                    <label>예약 시간 <span style="color:#e53935;">*</span></label>
+                    <input type="time" id="apptTime" required>
+                </div>
+            </div>
+
+            <div class="form-group" id="wardGroup" style="display:none;">
+                <label>희망 병실 유형</label>
+                <select id="roomTypePref">
+                    <option value="">상관없음</option>
+                    <option value="single">1인실</option>
+                    <option value="double">2인실</option>
+                    <option value="shared">다인실</option>
+                </select>
+                <div class="hint">입원 예약: 가용 병상 사전 확인 후 등록됩니다.</div>
+            </div>
+
+            <div class="form-group">
+                <label>메모</label>
+                <input type="text" id="notes" placeholder="특이사항 등 (선택)">
+            </div>
+
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <i class="fas fa-save" style="margin-right:6px;"></i>예약 등록
+            </button>
+        </form>
+    </div>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    let _patientHash = null;
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+
+        if (!['nurse', 'admin'].includes(me.role)) {
+            alert('간호사·관리자만 접수를 할 수 있습니다.');
+            loadPage('/index.html');
+            return;
+        }
+
+        document.getElementById('apptDate').value = new Date().toISOString().split('T')[0];
+
+        // 예약 유형 로드
+        const tr = await apiCall('/portal/doctor/appointment-types');
+        if (tr && tr.ok) {
+            const types = await tr.json();
+            const sel = document.getElementById('typeCode');
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.type_code;
+                opt.textContent = t.type_name;
+                sel.appendChild(opt);
+            });
+        }
+
+        // 진료과 로드
+        const dr = await apiCall('/portal/doctor/staff/departments');
+        if (dr && dr.ok) {
+            const depts = await dr.json();
+            const sel = document.getElementById('deptCode');
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.department_code;
+                opt.textContent = d.department_name;
+                sel.appendChild(opt);
+            });
+        }
+    }
+
+    async function searchPatient() {
+        const q = document.getElementById('patientQuery').value.trim();
+        const resultBox = document.getElementById('searchResultBox');
+        if (!q) { alert('회원번호 또는 환자 이름을 입력하세요.'); return; }
+
+        resultBox.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#94a3b8;"><i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>조회 중...</div>';
+        resultBox.style.display = '';
+
+        const res = await apiCall(`/emr/nurse/patients/search?q=${encodeURIComponent(q)}&limit=10`);
+        if (!res || !res.ok) {
+            resultBox.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#ef4444;">조회 실패 — 온프레미스 연결을 확인하세요.</div>';
+            return;
+        }
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (!items.length) {
+            resultBox.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#94a3b8;">검색 결과가 없습니다.</div>';
+            return;
+        }
+
+        const GENDER = { M:'남', F:'여' };
+        resultBox.innerHTML = items.map((p, i) => `
+            <div data-idx="${i}"
+                 style="padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"
+                 onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''"
+                 onclick="selectPatient(${i})">
+                <span>
+                    <strong style="margin-right:8px;">${_esc(p.patient_name)}</strong>
+                    <span style="color:#94a3b8;font-size:12px;">${_esc(p.member_number||'-')} · ${p.birth_date ? p.birth_date.slice(0,4)+'년생' : '-'} · ${GENDER[p.gender_code]||'-'}</span>
+                </span>
+                <span style="font-size:11px;color:#0ea5e9;">선택</span>
+            </div>
+        `).join('');
+
+        // 클로저로 items 저장
+        window._apptSearchItems = items;
+    }
+
+    function selectPatient(idx) {
+        const p = (window._apptSearchItems || [])[idx];
+        if (!p) return;
+        showPatient(p);
+        document.getElementById('searchResultBox').style.display = 'none';
+    }
+
+    function showPatient(p) {
+        _patientHash = p.patient_id_hash;
+        const GENDER = { M:'남', F:'여' };
+        document.getElementById('pMember').textContent = p.member_number || '-';
+        document.getElementById('pName').textContent   = p.patient_name  || '-';
+        document.getElementById('pBirth').textContent  = p.birth_date ? p.birth_date.slice(0,4) + '년생' : '-';
+        document.getElementById('pGender').textContent = GENDER[p.gender_code] || '-';
+        document.getElementById('patientBox').style.display = 'block';
+        loadReceptionInfo(p.patient_id_hash);
+    }
+
+    async function loadReceptionInfo(hash) {
+        const infoEl    = document.getElementById('receptionInfo');
+        const diagEl    = document.getElementById('riDiagList');
+        const allergyEl = document.getElementById('riAllergyList');
+        infoEl.style.display = 'none';
+
+        const res = await apiCall(`/portal/doctor/nurse/patients/${encodeURIComponent(hash)}/reception-info`);
+        if (!res || !res.ok) return;
+        const data = await res.json();
+
+        const diags    = data.diagnoses   || [];
+        const allergies = data.allergies  || [];
+        if (!diags.length && !allergies.length) return;
+
+        diagEl.innerHTML = diags.length
+            ? diags.map(d => {
+                const isSensitive = d.diagnosis_code === '[민감]';
+                const label = isSensitive
+                    ? '[민감]'
+                    : `${_esc(d.diagnosis_code)}${d.diagnosis_text ? ' ' + _esc(d.diagnosis_text) : ''}${d.is_primary ? ' ★' : ''}`;
+                return `<span class="badge badge-diag${isSensitive ? ' sensitive' : ''}">${label}</span>`;
+              }).join('')
+            : '<span style="font-size:11px;color:#94a3b8;">없음</span>';
+
+        allergyEl.innerHTML = allergies.length
+            ? allergies.map(a => `<span class="badge badge-allergy">${_esc(a.allergy_name)}${a.severity ? ' (' + _esc(a.severity) + ')' : ''}</span>`).join('')
+            : '<span style="font-size:11px;color:#94a3b8;">없음</span>';
+
+        infoEl.style.display = 'block';
+    }
+
+    function clearPatient() {
+        _patientHash = null;
+        document.getElementById('patientQuery').value = '';
+        document.getElementById('patientBox').style.display = 'none';
+        document.getElementById('receptionInfo').style.display = 'none';
+        document.getElementById('searchResultBox').style.display = 'none';
+        document.getElementById('patientQuery').focus();
+    }
+
+    function _esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function onTypeChange() {
+        const code = document.getElementById('typeCode').value;
+        document.getElementById('preOpNotice').style.display = (code === 'PRE_OP') ? '' : 'none';
+        document.getElementById('wardGroup').style.display   = (code === 'inpatient') ? '' : 'none';
+    }
+
+    async function loadDoctors() {
+        const deptCode = document.getElementById('deptCode').value;
+        const sel = document.getElementById('doctorId');
+        sel.innerHTML = '<option value="">로딩 중...</option>';
+        const url = deptCode ? `/portal/doctor/staff/doctors?department_code=${deptCode}` : '/portal/doctor/staff/doctors';
+        const res = await apiCall(url);
+        sel.innerHTML = '<option value="">선택하세요</option>';
+        if (!res || !res.ok) return;
+        const docs = await res.json();
+        docs.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.doctor_id;
+            opt.textContent = d.doctor_name;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function submitAppt(e) {
+        e.preventDefault();
+        const errEl = document.getElementById('errBox');
+        const okEl  = document.getElementById('okBox');
+        errEl.style.display = 'none';
+        okEl.style.display  = 'none';
+
+        if (!_patientHash) {
+            errEl.textContent = '환자 조회를 먼저 완료하세요.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        const typeCode = document.getElementById('typeCode').value;
+        const deptCode = document.getElementById('deptCode').value;
+        const doctorId = document.getElementById('doctorId').value;
+        const apptDate = document.getElementById('apptDate').value;
+        const apptTime = document.getElementById('apptTime').value;
+
+        if (!typeCode || !deptCode || !doctorId || !apptDate || !apptTime) {
+            errEl.textContent = '필수 항목(유형·진료과·의사·날짜·시간)을 모두 입력하세요.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        // 입원 예약 시 병상 가용 확인
+        if (typeCode === 'inpatient') {
+            const wardRes = await apiCall('/portal/doctor/staff/wards');
+            if (wardRes && wardRes.ok) {
+                const wards = await wardRes.json();
+                const totalAvail = wards.reduce((s, w) => s + (w.available_beds || 0), 0);
+                if (totalAvail === 0) {
+                    errEl.textContent = '현재 가용 병상이 없습니다. 병동 현황을 확인하세요.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+            }
+        }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>등록 중...';
+
+        const body = {
+            patient_id_hash: _patientHash,
+            type_code:        typeCode,
+            department_code:  deptCode,
+            doctor_id:        doctorId,
+            appointment_date: apptDate,
+            appointment_time: apptTime,
+            notes: document.getElementById('notes').value.trim() || null,
+        };
+        if (typeCode === 'inpatient') {
+            const rtp = document.getElementById('roomTypePref').value;
+            if (rtp) body.room_type_pref = rtp;
+        }
+
+        try {
+            const res = await apiCall('/portal/doctor/staff/appointments', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+            if (res && res.ok) {
+                const data = await res.json();
+                okEl.textContent   = `예약 등록 완료! (예약 ID: ${data.appointment_id?.slice(0,8)}…)`;
+                okEl.style.display = 'block';
+                document.getElementById('apptForm').reset();
+                document.getElementById('patientBox').style.display = 'none';
+                _patientHash = null;
+                onTypeChange();
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                errEl.textContent = err.detail || '등록 중 오류가 발생했습니다.';
+                errEl.style.display = 'block';
+            }
+        } catch {
+            errEl.textContent = '서버 오류가 발생했습니다.';
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save" style="margin-right:6px;"></i>예약 등록';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const q = document.getElementById('patientQuery');
+        if (q) q.addEventListener('keypress', e => { if (e.key === 'Enter') searchPatient(); });
+    });
+
+    init();
+</script>
+</body>
+</html>

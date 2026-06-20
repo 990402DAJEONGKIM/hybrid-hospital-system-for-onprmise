@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 환자 목록 — 김이박 병원</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1300px; margin:80px auto 40px; padding:0 16px; }
+        .isms-notice { background:#fff8e1; border:1px solid #f59e0b; border-radius:6px; padding:10px 16px; font-size:12px; color:#92400e; margin-bottom:16px; }
+
+        /* 검색 */
+        .search-row { display:flex; gap:8px; margin-bottom:14px; }
+        .search-row input { flex:1; padding:9px 12px; border:1px solid #cfd8dc; border-radius:6px; font-size:14px; }
+        .search-row button { padding:9px 18px; background:var(--primary,#1e88e5); color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+        .search-row button:hover { opacity:.85; }
+
+        /* 탭 + 정렬 */
+        .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .tab-bar { display:flex; gap:0; border-bottom:2px solid #e2e8f0; }
+        .tab-btn { padding:9px 22px; font-size:14px; font-weight:600; border:none; background:none; cursor:pointer; color:#94a3b8; border-bottom:2px solid transparent; margin-bottom:-2px; transition:color .15s, border-color .15s; }
+        .tab-btn.active { color:#1d4ed8; border-bottom-color:#1d4ed8; }
+        .sort-bar { display:flex; align-items:center; gap:8px; font-size:13px; color:#546e7a; }
+        .sort-bar select { padding:6px 10px; border:1px solid #cfd8dc; border-radius:6px; font-size:13px; }
+
+        /* 환자 목록 테이블 */
+        .data-table { width:100%; border-collapse:collapse; font-size:14px; }
+        .data-table th { background:#eceff1; padding:10px 12px; text-align:left; font-weight:600; color:#546e7a; border-bottom:2px solid #cfd8dc; }
+        .data-table td { padding:10px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+        .data-table tr:hover td { background:#f5f5f5; cursor:pointer; }
+        .btn-sm { padding:5px 12px; background:#ede9fe; color:#6d28d9; border:none; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; }
+        .btn-sm:hover { background:#ddd6fe; }
+        .empty-msg { text-align:center; padding:40px; color:#90a4ae; }
+        #errMsg { color:#e53935; font-size:13px; margin-bottom:10px; min-height:18px; }
+
+        /* 페이지네이션 */
+        .pagination { display:flex; justify-content:center; gap:6px; margin-top:16px; }
+        .pagination button { padding:6px 12px; border:1px solid #e2e8f0; border-radius:4px; background:#fff; font-size:13px; cursor:pointer; }
+        .pagination button.active { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
+        .pagination button:disabled { opacity:.45; cursor:not-allowed; }
+
+        /* ── EMR 두 컬럼 레이아웃 ── */
+        #emr-section { display:none; }
+
+        .emr-header { display:flex; align-items:center; gap:14px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #e2e8f0; }
+        .btn-back { padding:8px 16px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+        .btn-back:hover { background:#e2e8f0; }
+        .emr-patient-title { font-size:20px; font-weight:700; color:#1e293b; }
+        .emr-patient-meta { font-size:13px; color:#78909c; margin-top:2px; }
+
+        .emr-columns { display:grid; grid-template-columns:55fr 45fr; gap:20px; align-items:start; }
+
+        /* 공통 컬럼 카드 */
+        .emr-col { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+        .emr-col-title { font-size:15px; font-weight:700; color:#1e293b; margin:0 0 4px; padding-bottom:14px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:8px; }
+
+        /* 상세 섹션 */
+        .detail-section { padding:14px 0; border-bottom:1px solid #f1f5f9; }
+        .detail-section:last-child { border-bottom:none; padding-bottom:0; }
+        .detail-section h4 {
+            font-size:11px; font-weight:700; color:#64748b;
+            margin:0 0 9px; text-transform:uppercase; letter-spacing:.7px;
+            display:flex; align-items:center; gap:7px;
+        }
+        .detail-section h4::before {
+            content:''; display:inline-block; width:3px; height:12px;
+            border-radius:2px; background:var(--sec-color,#cbd5e1); flex-shrink:0;
+        }
+        .detail-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .detail-table th { width:80px; text-align:left; padding:6px 8px; color:#78909c; font-weight:600; background:#f8fafc; vertical-align:top; border-bottom:1px solid #f1f5f9; }
+        .detail-table td { padding:6px 8px; color:#374151; border-bottom:1px solid #f1f5f9; }
+        .detail-table tr:last-child th,
+        .detail-table tr:last-child td { border-bottom:none; }
+        .sub-list { font-size:13px; padding-left:0; list-style:none; margin:0; display:flex; flex-direction:column; gap:4px; }
+        .sub-list li { padding:6px 10px; border-radius:6px; background:#f8fafc; color:#374151; line-height:1.45; border-left:3px solid var(--sec-color,#cbd5e1); }
+
+        /* AI 요약 카드 */
+        .ai-summary-box { font-size:13px; color:#374151; line-height:1.7; white-space:pre-wrap; background:#f5f3ff; border-radius:6px; padding:10px 12px; }
+        .ai-summary-date { font-size:11px; color:#94a3b8; text-align:right; margin-top:4px; }
+
+        /* 임상 노트 카드 */
+        .note-card { background:#f8fafc; border-radius:8px; padding:10px 12px; border-left:3px solid #7c3aed; display:flex; flex-direction:column; gap:5px; }
+        .note-card + .note-card { margin-top:6px; }
+        .note-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#7c3aed; text-transform:uppercase; letter-spacing:.4px; }
+        .note-text { font-size:13px; color:#374151; line-height:1.55; word-break:break-word; white-space:pre-wrap; }
+        .note-date { font-size:11px; color:#94a3b8; text-align:right; }
+
+        /* 오른쪽 — 진료 시작 버튼 */
+        .btn-start-enc { padding:10px 20px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; width:100%; margin-bottom:16px; }
+        .btn-start-enc:hover { background:#047857; }
+        .btn-start-enc:disabled { opacity:.45; cursor:not-allowed; }
+
+        /* SOAP 폼 */
+        .soap-row { margin-bottom:11px; }
+        .soap-row label { display:block; font-size:12px; font-weight:700; color:#546e7a; margin-bottom:4px; }
+        .soap-row textarea { width:100%; padding:8px 10px; border:1px solid #cfd8dc; border-radius:6px; font-size:13px; height:64px; resize:vertical; box-sizing:border-box; }
+        .kcd-section-title { font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.6px; display:flex; align-items:center; gap:8px; margin:14px 0 8px; }
+        .kcd-row { display:flex; gap:6px; margin-bottom:6px; align-items:center; }
+        .kcd-row input { padding:7px 9px; border:1px solid #cfd8dc; border-radius:5px; font-size:13px; }
+        .kcd-row .inp-code { width:100px; }
+        .kcd-row .inp-text { flex:1; }
+        .kcd-row .chk-wrap { display:flex; align-items:center; gap:3px; font-size:12px; white-space:nowrap; }
+        .kcd-row .btn-del { padding:4px 9px; background:#fee2e2; color:#991b1b; border:none; border-radius:4px; font-size:12px; cursor:pointer; }
+        .btn-add-kcd { padding:5px 10px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:4px; font-size:12px; cursor:pointer; }
+        .soap-actions { display:flex; gap:8px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+        .soap-actions button { padding:9px 18px; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+        .btn-draft    { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0 !important; }
+        .btn-complete { background:#059669; color:#fff; }
+        .btn-copy-prev { background:#fff; color:#546e7a; border:1px solid #cfd8dc !important; font-size:12px !important; padding:7px 14px !important; width:100%; display:flex; align-items:center; justify-content:center; gap:5px; margin-bottom:14px; }
+        #soapMsg { font-size:13px; margin-top:8px; min-height:16px; }
+
+        @media (max-width:960px) { .emr-columns { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+
+    <!-- ── 환자 목록 섹션 ── -->
+    <div id="list-section">
+        <h2 style="margin-bottom:4px;">내 환자 목록</h2>
+
+        <div class="search-row">
+            <input type="text" id="searchInput" placeholder="환자명 또는 회원번호 검색"
+                   onkeydown="if(event.key==='Enter') loadPatients()" />
+            <button onclick="loadPatients()"><i class="fas fa-search" style="margin-right:5px;"></i>조회</button>
+        </div>
+
+        <div class="toolbar">
+            <div class="tab-bar">
+                <button id="tab-outpatient" class="tab-btn active" onclick="switchTab('outpatient')">
+                    <i class="fas fa-user-injured" style="margin-right:4px;"></i>외래환자
+                </button>
+                <button id="tab-inpatient" class="tab-btn" onclick="switchTab('inpatient')">
+                    <i class="fas fa-bed" style="margin-right:4px;"></i>입원환자
+                </button>
+            </div>
+            <div class="sort-bar">
+                <label>정렬</label>
+                <select id="sortSelect" onchange="loadPatients()">
+                    <option value="patient_name">환자명</option>
+                    <option value="last_visit">최근 방문일</option>
+                    <option value="next_appt">다음 예약일</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="errMsg"></div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>회원번호</th>
+                    <th>환자명</th>
+                    <th>생년월일</th>
+                    <th>성별</th>
+                    <th>최근 방문일</th>
+                    <th>다음 예약일</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="patientBody">
+                <tr><td colspan="7" class="empty-msg">로딩 중...</td></tr>
+            </tbody>
+        </table>
+        <div id="pagination" class="pagination"></div>
+    </div>
+
+    <!-- ── EMR 상세 (두 컬럼: 과거 기록 | 오늘 진료) ── -->
+    <div id="emr-section">
+        <div class="emr-header">
+            <button class="btn-back" onclick="backToList()">
+                <i class="fas fa-arrow-left" style="margin-right:5px;"></i>목록으로
+            </button>
+            <div>
+                <div class="emr-patient-title" id="emrPatientTitle">조회 중...</div>
+                <div class="emr-patient-meta" id="emrPatientMeta"></div>
+            </div>
+        </div>
+
+        <div class="emr-columns">
+            <!-- 왼쪽: 과거 진료 기록 -->
+            <div class="emr-col">
+                <div class="emr-col-title">
+                    <i class="fas fa-history" style="color:#546e7a;"></i>과거 진료 기록
+                </div>
+
+                <!-- AI 진료 요약 (온프레미스 전용) -->
+                <div class="detail-section" style="--sec-color:#7c3aed">
+                    <h4><i class="fas fa-robot" style="color:#7c3aed;font-size:10px;"></i>AI 진료 요약</h4>
+                    <div id="dAiSummary" class="ai-summary-box">
+                        <span style="color:#94a3b8;">조회 중...</span>
+                    </div>
+                    <div id="dAiSummaryDate" class="ai-summary-date"></div>
+                </div>
+
+                <div class="detail-section" style="--sec-color:#3b82f6">
+                    <h4><i class="fas fa-user" style="color:#3b82f6;font-size:10px;"></i>환자 기본 정보</h4>
+                    <table class="detail-table">
+                        <tr><th>환자명</th><td id="dName">-</td></tr>
+                        <tr><th>생년월일</th><td id="dBirth">-</td></tr>
+                        <tr><th>성별</th><td id="dGender">-</td></tr>
+                        <tr><th>전화번호</th><td id="dPhone">-</td></tr>
+                    </table>
+                </div>
+
+                <div class="detail-section" style="--sec-color:#0ea5e9">
+                    <h4><i class="fas fa-clipboard-list" style="color:#0ea5e9;font-size:10px;"></i>진료 이력</h4>
+                    <ul class="sub-list" id="dEncounters"><li>없음</li></ul>
+                </div>
+
+                <div class="detail-section" style="--sec-color:#8b5cf6">
+                    <h4><i class="fas fa-stethoscope" style="color:#8b5cf6;font-size:10px;"></i>진단 (KCD)</h4>
+                    <ul class="sub-list" id="dDiagnoses"><li>없음</li></ul>
+                </div>
+
+                <div class="detail-section" style="--sec-color:#ef4444">
+                    <h4><i class="fas fa-exclamation-circle" style="color:#ef4444;font-size:10px;"></i>알레르기</h4>
+                    <ul class="sub-list" id="dAllergies"><li>없음</li></ul>
+                </div>
+
+                <div class="detail-section" style="--sec-color:#7c3aed">
+                    <h4><i class="fas fa-notes-medical" style="color:#7c3aed;font-size:10px;"></i>임상 노트</h4>
+                    <div id="dNotes"><span style="font-size:13px;color:#94a3b8;">없음</span></div>
+                </div>
+
+                <div class="detail-section" style="--sec-color:#64748b">
+                    <h4><i class="fas fa-procedures" style="color:#64748b;font-size:10px;"></i>수술 이력</h4>
+                    <ul class="sub-list" id="dSurgeries"><li>없음</li></ul>
+                </div>
+
+            </div>
+
+            <!-- 오른쪽: 오늘의 진료 (SFR-019) -->
+            <div class="emr-col">
+                <div class="emr-col-title">
+                    <i class="fas fa-stethoscope" style="color:#059669;"></i>오늘의 진료
+                </div>
+
+                <button id="btnStartEnc" class="btn-start-enc" onclick="startEncounter()">
+                    <i class="fas fa-stethoscope" style="margin-right:6px;"></i>진료 시작
+                </button>
+
+                <div id="soapForm" style="display:none;">
+                    <button class="btn-copy-prev" onclick="loadPreviousEncounter()">
+                        <i class="fas fa-copy"></i>이전 진료 기록 복사
+                    </button>
+
+                    <div class="soap-row">
+                        <label>S — 주호소 (Subjective)</label>
+                        <textarea id="noteS" placeholder="환자 호소 증상"></textarea>
+                    </div>
+                    <div class="soap-row">
+                        <label>O — 검사소견 (Objective)</label>
+                        <textarea id="noteO" placeholder="활력 징후, 진찰 소견, 검사 결과"></textarea>
+                    </div>
+                    <div class="soap-row">
+                        <label>A — 진단/평가 (Assessment)</label>
+                        <textarea id="noteA" placeholder="진단 평가"></textarea>
+                    </div>
+                    <div class="soap-row">
+                        <label>P — 치료계획 (Plan)</label>
+                        <textarea id="noteP" placeholder="처방 및 치료 계획"></textarea>
+                    </div>
+
+                    <div class="kcd-section-title">
+                        KCD 진단코드
+                        <button class="btn-add-kcd" onclick="addKcdRow()">
+                            <i class="fas fa-plus" style="margin-right:3px;"></i>추가
+                        </button>
+                    </div>
+                    <div id="kcdRows"></div>
+
+                    <div class="soap-actions">
+                        <button class="btn-draft" onclick="saveDraft()">임시 저장</button>
+                        <button class="btn-complete" onclick="completeEncounter()">
+                            <i class="fas fa-check" style="margin-right:4px;"></i>진료 완료
+                        </button>
+                    </div>
+                    <div id="soapMsg"></div>
+                </div>
+
+                <div id="emrErrMsg" style="color:#e53935;font-size:13px;margin-top:8px;min-height:16px;"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+let _tab  = 'outpatient';
+let _page = 0;
+const _PAGE_SIZE = 20;
+let _currentPatientId   = null;
+let _currentEncounterId = null;
+
+function _esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                          .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── 초기화 ────────────────────────────────────────────────────
+async function init() {
+    const me = await initLayout();
+    if (!me) return;
+    if (me.role !== 'doctor') {
+        alert('의사 계정만 접근할 수 있습니다.');
+        window.location.href = 'index.html';
+        return;
+    }
+    await loadPatients();
+    const params    = new URLSearchParams(window.location.search);
+    const directPid = params.get('patient_id');
+    if (directPid) await openEmr(directPid);
+}
+
+// ── 환자 목록 ─────────────────────────────────────────────────
+function switchTab(t) {
+    _tab  = t;
+    _page = 0;
+    document.getElementById('tab-outpatient').classList.toggle('active', t === 'outpatient');
+    document.getElementById('tab-inpatient').classList.toggle('active',  t === 'inpatient');
+    loadPatients();
+}
+
+async function loadPatients() {
+    const q    = document.getElementById('searchInput').value.trim();
+    const sort = document.getElementById('sortSelect').value;
+    const errEl = document.getElementById('errMsg');
+    errEl.textContent = '';
+
+    let url = `/emr/doctor/patients?tab=${_tab}&sort=${sort}&limit=${_PAGE_SIZE}&offset=${_page * _PAGE_SIZE}`;
+    if (q) url += `&q=${encodeURIComponent(q)}`;
+
+    const res = await apiCall(url);
+    if (!res || !res.ok) {
+        errEl.textContent = res?.status === 503
+            ? '온프레미스 DB에 연결할 수 없습니다.'
+            : '환자 목록 조회에 실패했습니다.';
+        return;
+    }
+    renderPatientList(await res.json());
+}
+
+function renderPatientList(data) {
+    const tbody = document.getElementById('patientBody');
+    const items = data.items || [];
+    if (!items.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">해당 환자가 없습니다.</td></tr>`;
+        renderPagination(0);
+        return;
+    }
+    const gMap = { M:'남', F:'여' };
+    tbody.innerHTML = items.map(p => {
+        const birth = p.birth_date ? p.birth_date.slice(0,4) + '년생' : '-';
+        const lv    = p.last_visit ? p.last_visit.slice(0,10) : '-';
+        const na    = p.next_appt
+            ? `<span style="color:#1d4ed8;font-weight:600;">${_esc(p.next_appt)}</span>` : '-';
+        return `<tr onclick="openEmr('${_esc(p.patient_id)}')">
+            <td style="font-family:monospace;font-size:12px;color:#64748b;">${_esc(p.member_number||'-')}</td>
+            <td style="font-weight:600;">${_esc(p.patient_name||'-')}</td>
+            <td>${_esc(birth)}</td>
+            <td>${_esc(gMap[p.gender_code]||p.gender_code||'-')}</td>
+            <td style="font-size:13px;color:#546e7a;">${_esc(lv)}</td>
+            <td style="font-size:13px;">${na}</td>
+            <td>
+                <button class="btn-sm" onclick="event.stopPropagation();openEmr('${_esc(p.patient_id)}')">
+                    <i class="fas fa-folder-open" style="margin-right:4px;"></i>EMR
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+    renderPagination(data.total || 0);
+}
+
+function renderPagination(total) {
+    const pages = Math.ceil(total / _PAGE_SIZE);
+    const el    = document.getElementById('pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    let html = `<button ${_page===0?'disabled':''} onclick="gotoPage(${_page-1})">&#8249;</button>`;
+    for (let i = 0; i < pages; i++)
+        html += `<button class="${i===_page?'active':''}" onclick="gotoPage(${i})">${i+1}</button>`;
+    html += `<button ${_page>=pages-1?'disabled':''} onclick="gotoPage(${_page+1})">&#8250;</button>`;
+    el.innerHTML = html;
+}
+
+function gotoPage(p) { _page = p; loadPatients(); }
+
+// ── EMR 뷰 전환 ────────────────────────────────────────────────
+function backToList() {
+    document.getElementById('list-section').style.display = '';
+    document.getElementById('emr-section').style.display  = 'none';
+    _currentPatientId   = null;
+    _currentEncounterId = null;
+}
+
+async function openEmr(patientId) {
+    _currentPatientId   = patientId;
+    _currentEncounterId = null;
+
+    document.getElementById('emrPatientTitle').textContent = '조회 중...';
+    document.getElementById('emrPatientMeta').textContent  = '';
+    document.getElementById('btnStartEnc').disabled        = true;
+    document.getElementById('btnStartEnc').style.display   = '';
+    document.getElementById('soapForm').style.display      = 'none';
+    document.getElementById('emrErrMsg').textContent       = '';
+    document.getElementById('soapMsg').textContent         = '';
+    document.getElementById('dAiSummary').innerHTML        = '<span style="color:#94a3b8;">조회 중...</span>';
+    document.getElementById('dAiSummaryDate').textContent  = '';
+    _resetSoap();
+
+    ['dEncounters','dDiagnoses','dAllergies','dSurgeries'].forEach(id => {
+        document.getElementById(id).innerHTML = '<li>조회 중...</li>';
+    });
+    document.getElementById('dNotes').innerHTML = '<span style="font-size:13px;color:#94a3b8;">조회 중...</span>';
+    document.getElementById('dName').textContent   = '-';
+    document.getElementById('dBirth').textContent  = '-';
+    document.getElementById('dGender').textContent = '-';
+    document.getElementById('dPhone').textContent  = '-';
+
+    document.getElementById('list-section').style.display = 'none';
+    document.getElementById('emr-section').style.display  = 'block';
+
+    const res = await apiCall(`/emr/doctor/patients/${patientId}/emr`);
+    if (!res) { backToList(); return; }
+
+    if (res.status === 403) {
+        document.getElementById('emrErrMsg').textContent = '담당 환자가 아닙니다.';
+        backToList();
+        return;
+    }
+    if (!res.ok) {
+        document.getElementById('emrErrMsg').textContent = 'EMR 조회에 실패했습니다.';
+        backToList();
+        return;
+    }
+
+    const d = await res.json();
+    const p = d.patient || {};
+
+    // AI 요약
+    const aiSum = d.ai_summary || {};
+    document.getElementById('dAiSummary').innerHTML = aiSum.summary_text
+        ? `<span>${_esc(aiSum.summary_text)}</span>`
+        : '<span style="color:#94a3b8;">요약 없음 (다음 배치 후 생성)</span>';
+    document.getElementById('dAiSummaryDate').textContent = aiSum.generated_at
+        ? `생성: ${aiSum.generated_at.slice(0,10)}`
+        : '';
+
+    document.getElementById('emrPatientTitle').textContent = p.patient_name || '알 수 없음';
+    document.getElementById('emrPatientMeta').textContent  =
+        [p.member_number,
+         p.birth_date ? p.birth_date.slice(0,4) + '년생' : '',
+         p.gender_code === 'M' ? '남' : p.gender_code === 'F' ? '여' : ''].filter(Boolean).join(' · ');
+    document.getElementById('dName').textContent   = p.patient_name  || '-';
+    document.getElementById('dBirth').textContent  = p.birth_date    ? p.birth_date.slice(0,4) + '년생' : '-';
+    document.getElementById('dGender').textContent = p.gender_code === 'M' ? '남' : p.gender_code === 'F' ? '여' : '-';
+    document.getElementById('dPhone').textContent  = p.phone_number  || '-';
+    document.getElementById('btnStartEnc').disabled = false;
+
+    const TYPE = { outpatient_new:'초진', outpatient_return:'재진', inpatient:'입원', pre_surgery:'수술 전' };
+    document.getElementById('dEncounters').innerHTML = (d.encounters||[]).length
+        ? (d.encounters||[]).map(e =>
+            `<li><strong>${_esc(TYPE[e.encounter_type]||e.encounter_type)}</strong>
+             &nbsp;<span style="color:#64748b;font-size:12px;">${_esc(e.visit_datetime?.replace('T',' ').slice(0,16)||'')}</span>
+             &nbsp;${_esc(e.department_code||'')}
+             &nbsp;<span style="color:#94a3b8;font-size:11px;">${_esc(e.status_code||'')}</span></li>`
+          ).join('') : '<li>없음</li>';
+
+    document.getElementById('dDiagnoses').innerHTML = (d.diagnoses||[]).length
+        ? (d.diagnoses||[]).map(diag =>
+            `<li><code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">${_esc(diag.diagnosis_code)}</code>
+             ${diag.is_primary?'<strong style="color:#1d4ed8;font-size:11px;margin-left:4px;">[주]</strong>':''}
+             &nbsp;${_esc(diag.diagnosis_text||'')}</li>`
+          ).join('') : '<li>없음</li>';
+
+    document.getElementById('dAllergies').innerHTML = (d.allergies||[]).length
+        ? (d.allergies||[]).map(a => `<li>${_esc(a.allergy_name)} (${_esc(a.severity_code)})</li>`).join('')
+        : '<li>없음</li>';
+
+    const NOTE_LABEL = { S:'주호소', O:'검사소견', A:'진단/평가', P:'치료계획' };
+    const NOTE_COLOR = { S:'#3b82f6', O:'#0ea5e9', A:'#7c3aed', P:'#059669' };
+    document.getElementById('dNotes').innerHTML = (d.clinical_notes||[]).length
+        ? (d.clinical_notes||[]).map(n => {
+            const color = NOTE_COLOR[n.note_type] || '#7c3aed';
+            return `<div class="note-card" style="border-left-color:${color}">
+                <span class="note-badge" style="color:${color}">
+                    <i class="fas fa-tag" style="font-size:9px;"></i>
+                    ${_esc(NOTE_LABEL[n.note_type]||n.note_type)}
+                </span>
+                <span class="note-text">${_esc(n.note_text||'')}</span>
+                <span class="note-date">${_esc(n.created_at?.slice(0,10)||'')}</span>
+            </div>`;
+          }).join('')
+        : '<span style="font-size:13px;color:#94a3b8;">없음</span>';
+
+    document.getElementById('dSurgeries').innerHTML = (d.surgeries||[]).length
+        ? (d.surgeries||[]).map(s =>
+            `<li><strong>${_esc(s.surgery_name)}</strong>
+             &nbsp;<span style="color:#64748b;font-size:12px;">${_esc(s.surgery_date||'')}</span></li>`
+          ).join('') : '<li>없음</li>';
+}
+
+// ── 진료 시작 (SFR-019) ───────────────────────────────────────
+async function startEncounter() {
+    if (!_currentPatientId) return;
+    const btn = document.getElementById('btnStartEnc');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+
+    const res = await apiCall('/emr/doctor/encounters', {
+        method: 'POST',
+        body:   JSON.stringify({
+            patient_id:      _currentPatientId,
+            department_code: window._cachedMe?.department_code || 'GEN',
+        }),
+    });
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-stethoscope" style="margin-right:6px;"></i>진료 시작';
+
+    if (!res || !res.ok) {
+        const e = await res?.json().catch(()=>({}));
+        document.getElementById('soapMsg').textContent = `오류: ${e.detail||'진료 시작 실패'}`;
+        document.getElementById('soapMsg').style.color = '#e53935';
+        return;
+    }
+    const enc = await res.json();
+    _currentEncounterId = enc.encounter_id;
+    btn.style.display = 'none';
+    document.getElementById('soapForm').style.display = 'block';
+    document.getElementById('soapMsg').textContent    = '';
+}
+
+// ── KCD 행 ────────────────────────────────────────────────────
+let _kcdIdx = 0;
+function addKcdRow(code='', text='', isPrimary=false) {
+    const i = _kcdIdx++;
+    const row = document.createElement('div');
+    row.className = 'kcd-row';
+    row.id = `kcd-${i}`;
+    row.innerHTML = `
+        <input class="inp-code" placeholder="KCD 코드" value="${_esc(code)}" id="kc-${i}" />
+        <input class="inp-text" placeholder="진단명(원문)" value="${_esc(text)}" id="kt-${i}" />
+        <label class="chk-wrap"><input type="checkbox" id="kp-${i}" ${isPrimary?'checked':''} /> 주상병</label>
+        <button class="btn-del" onclick="document.getElementById('kcd-${i}').remove()">
+            <i class="fas fa-times"></i>
+        </button>`;
+    document.getElementById('kcdRows').appendChild(row);
+}
+
+function _getKcdRows() {
+    return [...document.querySelectorAll('.kcd-row')].map(row => {
+        const i = row.id.replace('kcd-','');
+        return {
+            diagnosis_code: document.getElementById(`kc-${i}`)?.value.trim() || '',
+            diagnosis_text: document.getElementById(`kt-${i}`)?.value.trim() || '',
+            is_primary:     document.getElementById(`kp-${i}`)?.checked || false,
+        };
+    }).filter(d => d.diagnosis_code);
+}
+
+function _resetSoap() {
+    ['noteS','noteO','noteA','noteP'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const kr = document.getElementById('kcdRows');
+    if (kr) kr.innerHTML = '';
+    _kcdIdx = 0;
+}
+
+async function loadPreviousEncounter() {
+    if (!_currentPatientId) return;
+    const res = await apiCall(`/emr/doctor/patients/${_currentPatientId}/encounters/latest`);
+    const msgEl = document.getElementById('soapMsg');
+    if (!res || res.status === 404) { msgEl.textContent = '이전 진료 기록이 없습니다.'; msgEl.style.color='#f59e0b'; return; }
+    if (!res.ok) { msgEl.textContent = '이전 기록 조회에 실패했습니다.'; msgEl.style.color='#e53935'; return; }
+    const prev = await res.json();
+    const nm = {};
+    (prev.clinical_notes||[]).forEach(n => { nm[n.note_type] = n.note_text; });
+    ['S','O','A','P'].forEach(t => { const el=document.getElementById(`note${t}`); if(el&&nm[t]) el.value=nm[t]; });
+    document.getElementById('kcdRows').innerHTML = '';
+    _kcdIdx = 0;
+    (prev.diagnoses||[]).forEach(d => addKcdRow(d.diagnosis_code, d.diagnosis_text, d.is_primary));
+    msgEl.textContent = '이전 기록을 불러왔습니다.'; msgEl.style.color='#059669';
+}
+
+async function _saveAll() {
+    if (!_currentEncounterId) return false;
+    const msgEl = document.getElementById('soapMsg');
+    for (const t of ['S','O','A','P']) {
+        const text = document.getElementById(`note${t}`)?.value.trim();
+        if (!text) continue;
+        const r = await apiCall(`/emr/doctor/encounters/${_currentEncounterId}/notes`,
+            { method:'POST', body:JSON.stringify({ note_type:t, note_text:text }) });
+        if (!r||!r.ok) { const e=await r?.json().catch(()=>({})); msgEl.textContent=`노트 오류: ${e.detail||'실패'}`; msgEl.style.color='#e53935'; return false; }
+    }
+    for (const diag of _getKcdRows()) {
+        const r = await apiCall(`/emr/doctor/encounters/${_currentEncounterId}/diagnoses`,
+            { method:'POST', body:JSON.stringify(diag) });
+        if (!r||!r.ok) { const e=await r?.json().catch(()=>({})); msgEl.textContent=`진단 오류: ${e.detail||'실패'}`; msgEl.style.color='#e53935'; return false; }
+    }
+    return true;
+}
+
+async function saveDraft() {
+    const msgEl = document.getElementById('soapMsg');
+    msgEl.textContent='저장 중...'; msgEl.style.color='#546e7a';
+    if (await _saveAll()) { msgEl.textContent='임시 저장되었습니다.'; msgEl.style.color='#059669'; }
+}
+
+async function completeEncounter() {
+    const msgEl = document.getElementById('soapMsg');
+    msgEl.textContent='저장 중...'; msgEl.style.color='#546e7a';
+    if (!await _saveAll()) return;
+    const res = await apiCall(`/emr/doctor/encounters/${_currentEncounterId}`,
+        { method:'PATCH', body:JSON.stringify({ status_code:'completed' }) });
+    if (!res||!res.ok) { const e=await res?.json().catch(()=>({})); msgEl.textContent=`완료 오류: ${e.detail||'실패'}`; msgEl.style.color='#e53935'; return; }
+    msgEl.textContent='진료가 완료되었습니다.'; msgEl.style.color='#059669';
+    document.getElementById('soapForm').style.display='none';
+    _currentEncounterId=null;
+    setTimeout(()=>openEmr(_currentPatientId), 1000);
+}
+
+init();
+</script>
+</body>
+</html>

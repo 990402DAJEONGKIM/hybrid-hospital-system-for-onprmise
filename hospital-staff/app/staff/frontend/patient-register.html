@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>환자 등록 — 김이박 클리닉</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1100px; margin:80px auto 40px; padding:0 24px; }
+        .page-header { display:flex; align-items:center; gap:12px; margin-bottom:28px; }
+        .page-header a { color:#6b7280; font-size:13px; text-decoration:none; }
+        .page-header a:hover { color:#374151; }
+        .page-title { font-size:22px; font-weight:800; color:#1e293b; margin:0; }
+        .page-sub   { font-size:13px; color:#78909c; margin:4px 0 0; }
+        .card {
+            background:#fff; border-radius:12px; padding:28px;
+            box-shadow:0 2px 12px rgba(0,0,0,.07); margin-bottom:20px;
+        }
+        .card-title { font-size:15px; font-weight:700; color:#1e293b; margin-bottom:20px; }
+        .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+        .form-label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:5px; }
+        .form-control {
+            width:100%; padding:9px 12px;
+            border:1px solid #d1d5db; border-radius:8px;
+            font-size:14px; outline:none; background:#f9fafb;
+            transition:border-color .15s, background .15s;
+            box-sizing:border-box;
+        }
+        .form-control:focus { border-color:#1d4ed8; background:#fff; }
+        .btn-primary {
+            background:#1d3a6e; color:#fff; border:none;
+            padding:10px 20px; border-radius:8px; font-size:14px;
+            font-weight:700; cursor:pointer; transition:background .15s;
+        }
+        .btn-primary:hover    { background:#1e40af; }
+        .btn-primary:disabled { opacity:.6; cursor:not-allowed; }
+        .err-box {
+            display:none; padding:10px 12px;
+            background:#fef2f2; border:1px solid #fca5a5;
+            border-radius:8px; font-size:13px; color:#991b1b;
+            margin-bottom:14px;
+        }
+        .result-box {
+            display:none;
+            background:#f0fdf4; border:2px solid #059669;
+            border-radius:12px; padding:24px; margin-top:20px;
+        }
+        .result-row { display:flex; gap:12px; margin-bottom:10px; font-size:14px; }
+        .result-label { color:#6b7280; min-width:100px; }
+        .result-value { font-weight:700; font-size:18px; color:#059669; letter-spacing:.05em; }
+        .warn-box {
+            background:#fffbeb; border:1px solid #fde68a;
+            border-radius:8px; padding:10px 14px;
+            font-size:12px; color:#92400e; margin-top:14px;
+        }
+    </style>
+</head>
+<body>
+<div id="page-content">
+
+<div class="page-wrap">
+    <div class="page-header">
+        <h1 class="page-title">환자 등록</h1>
+    </div>
+    <p class="page-sub" style="margin-bottom:24px;">원무과 담당자가 신규 환자를 등록합니다. 등록 완료 후 회원번호와 초기 비밀번호를 환자에게 전달하세요.</p>
+
+    <div class="card">
+        <div class="card-title">신규 환자 정보 입력</div>
+
+        <form id="registerForm">
+            <div class="form-grid">
+                <div>
+                    <label class="form-label">환자 이름 <span style="color:#dc2626;">*</span></label>
+                    <input type="text" id="patientName" class="form-control" placeholder="홍길동" required>
+                </div>
+                <div>
+                    <label class="form-label">생년월일 <span style="color:#dc2626;">*</span></label>
+                    <input type="date" id="birthDate" class="form-control" required>
+                </div>
+                <div>
+                    <label class="form-label">성별 <span style="color:#dc2626;">*</span></label>
+                    <select id="genderCode" class="form-control" required>
+                        <option value="">선택</option>
+                        <option value="M">남</option>
+                        <option value="F">여</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">연락처 <span style="color:#dc2626;">*</span></label>
+                    <input type="text" id="phoneNumber" class="form-control" placeholder="010-0000-0000" required>
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label class="form-label">주민등록번호</label>
+                <input type="text" id="nationalId" class="form-control" placeholder="주민등록번호 (암호화 저장)">
+            </div>
+
+            <div id="errBox" class="err-box">
+                <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i><span id="errMsg"></span>
+            </div>
+
+            <button type="submit" class="btn-primary" id="submitBtn" style="width:100%;">
+                <i class="fas fa-user-plus" style="margin-right:6px;"></i>환자 등록
+            </button>
+        </form>
+    </div>
+
+    <div class="result-box" id="resultBox">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-check" style="color:#fff;"></i>
+            </div>
+            <div class="card-title" style="margin:0;">환자 등록 완료</div>
+        </div>
+        <div class="result-row">
+            <span class="result-label">회원번호</span>
+            <span class="result-value" id="resultMemberNumber"></span>
+        </div>
+        <div class="result-row">
+            <span class="result-label">초기 비밀번호</span>
+            <span class="result-value" id="resultInitialPw"></span>
+            <span style="color:#9ca3af;font-size:12px;align-self:center;">(생년월일)</span>
+        </div>
+        <div class="result-row">
+            <span class="result-label">접수번호</span>
+            <span id="resultInternalSeq" style="font-size:14px;"></span>
+        </div>
+        <div class="warn-box">
+            <i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>
+            위 정보를 환자에게 직접 전달하세요. 첫 로그인 시 비밀번호 변경이 필요합니다.
+        </div>
+        <div style="margin-top:16px;">
+            <button class="btn-primary" onclick="resetForm()">
+                <i class="fas fa-user-plus" style="margin-right:5px;"></i>다음 환자 등록
+            </button>
+        </div>
+    </div>
+</div>
+
+</div>
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    (async () => {
+        const me = await initLayout();
+        if (!me) return;
+        if (!['nurse', 'admin'].includes(me.role)) {
+            alert('환자 등록 권한이 없습니다.');
+            window.location.href = 'index.html';
+        }
+    })();
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name   = document.getElementById('patientName').value.trim();
+        const birth  = document.getElementById('birthDate').value;
+        const gender = document.getElementById('genderCode').value;
+        const phone  = document.getElementById('phoneNumber').value.trim();
+        const natId  = document.getElementById('nationalId').value.trim();
+
+        const errBox = document.getElementById('errBox');
+        const errMsg = document.getElementById('errMsg');
+        errBox.style.display = 'none';
+
+        if (!name || !birth || !gender || !phone) {
+            errMsg.textContent = '필수 항목을 모두 입력해주세요.';
+            errBox.style.display = 'block';
+            return;
+        }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>등록 중...';
+
+        const body = { patient_name: name, birth_date: birth, gender_code: gender, phone_number: phone };
+        if (natId) body.national_id_encrypted = natId;
+
+        try {
+            const res = await fetch(`${BASE_URL}/emr/patients`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('resultMemberNumber').textContent = data.member_number;
+                document.getElementById('resultInitialPw').textContent    = data.initial_password;
+                document.getElementById('resultInternalSeq').textContent  = data.internal_seq;
+                document.getElementById('registerForm').closest('.card').style.display = 'none';
+                document.getElementById('resultBox').style.display = '';
+            } else {
+                const err = await res.json().catch(() => ({}));
+                errMsg.textContent = err.detail || '등록 중 오류가 발생했습니다.';
+                errBox.style.display = 'block';
+            }
+        } catch {
+            errMsg.textContent = '온프레미스 서버에 연결할 수 없습니다.';
+            errBox.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-user-plus" style="margin-right:6px;"></i>환자 등록';
+        }
+    });
+
+    function resetForm() {
+        document.getElementById('registerForm').reset();
+        document.getElementById('errBox').style.display = 'none';
+        document.getElementById('resultBox').style.display = 'none';
+        document.getElementById('registerForm').closest('.card').style.display = '';
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>보안 정책 관리 - MZ Clinic 관리자</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:680px; margin:80px auto 40px; padding:0 16px; }
+        .form-group { margin-bottom:20px; }
+        .form-group label { display:block; font-size:14px; font-weight:600; color:#546e7a; margin-bottom:6px; }
+        .form-group input[type="number"] { width:100%; padding:10px 12px; border:1px solid #cfd8dc; border-radius:6px; font-size:15px; box-sizing:border-box; }
+        .form-group input:focus { outline:none; border-color:var(--primary); }
+        .checkbox-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+        .checkbox-row input[type="checkbox"] { width:18px; height:18px; cursor:pointer; }
+        .checkbox-row label { font-size:14px; color:#263238; cursor:pointer; font-weight:400; margin-bottom:0; }
+        .section-divider { border:none; border-top:1px solid #e0e0e0; margin:24px 0; }
+        .section-title { font-size:13px; font-weight:700; color:#78909c; text-transform:uppercase; letter-spacing:.5px; margin-bottom:16px; }
+        .btn-row { display:flex; gap:10px; margin-top:28px; }
+        .btn-primary   { flex:1; padding:12px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:15px; font-weight:600; cursor:pointer; }
+        .btn-secondary { flex:1; padding:12px; background:#eceff1; color:#546e7a; border:none; border-radius:6px; font-size:15px; font-weight:600; cursor:pointer; }
+        #statusMsg { margin-top:12px; font-size:13px; min-height:18px; }
+        .msg-ok  { color:#2e7d32; }
+        .msg-err { color:#c62828; }
+        .back-link { font-size:13px; color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-bottom:16px; }
+        .back-link:hover { text-decoration:underline; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <h2 style="margin-bottom:6px;">보안 정책 관리</h2>
+    <p style="color:#78909c;font-size:14px;margin-bottom:24px;">비밀번호 및 계정 잠금 정책</p>
+
+    <div class="section-title">비밀번호 규칙</div>
+    <div class="form-group">
+        <label>최소 길이 (자)</label>
+        <input type="number" id="min_length" min="6" max="32" value="8">
+    </div>
+    <div class="form-group">
+        <label>만료 주기 (일, 0 = 무제한)</label>
+        <input type="number" id="expire_days" min="0" max="365" value="90">
+    </div>
+    <div class="form-group">
+        <label>복잡성 요건</label>
+        <div class="checkbox-row"><input type="checkbox" id="require_uppercase" checked><label for="require_uppercase">대문자 포함</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="require_lowercase" checked><label for="require_lowercase">소문자 포함</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="require_digit"     checked><label for="require_digit">숫자 포함</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="require_special"   checked><label for="require_special">특수문자 포함</label></div>
+    </div>
+
+    <hr class="section-divider">
+    <div class="section-title">계정 잠금 정책</div>
+    <div class="form-group">
+        <label>최대 로그인 실패 횟수 (잠금 기준)</label>
+        <input type="number" id="max_failed_logins" min="1" max="20" value="5">
+    </div>
+    <div class="form-group">
+        <label>잠금 해제까지 대기 시간 (분)</label>
+        <input type="number" id="lockout_minutes" min="1" max="1440" value="30">
+    </div>
+
+    <div id="statusMsg"></div>
+    <div class="btn-row">
+        <button class="btn-secondary" onclick="loadPolicy()">현재 값 불러오기</button>
+        <button class="btn-primary" onclick="savePolicy()">정책 저장</button>
+    </div>
+</div>
+
+</div>
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        if (me.role !== 'admin') {
+            alert('관리자 권한이 필요합니다.');
+            location.href = 'index.html';
+            return;
+        }
+        await loadPolicy();
+    }
+
+    async function loadPolicy() {
+        const res = await apiCall('/admin/password-policy');
+        if (!res || !res.ok) {
+            setStatus('현재 정책을 불러오지 못했습니다.', false);
+            return;
+        }
+        const p = await res.json();
+        document.getElementById('min_length').value        = p.min_length        ?? 8;
+        document.getElementById('expire_days').value       = p.expire_days       ?? 90;
+        document.getElementById('max_failed_logins').value = p.max_failed_logins ?? 5;
+        document.getElementById('lockout_minutes').value   = p.lockout_minutes   ?? 30;
+        document.getElementById('require_uppercase').checked = p.require_uppercase ?? true;
+        document.getElementById('require_lowercase').checked = p.require_lowercase ?? true;
+        document.getElementById('require_digit').checked     = p.require_digit     ?? true;
+        document.getElementById('require_special').checked   = p.require_special   ?? true;
+        setStatus('현재 정책이 로드되었습니다.', true);
+    }
+
+    async function savePolicy() {
+        const body = {
+            min_length:        parseInt(document.getElementById('min_length').value),
+            expire_days:       parseInt(document.getElementById('expire_days').value),
+            max_failed_logins: parseInt(document.getElementById('max_failed_logins').value),
+            lockout_minutes:   parseInt(document.getElementById('lockout_minutes').value),
+            require_uppercase: document.getElementById('require_uppercase').checked,
+            require_lowercase: document.getElementById('require_lowercase').checked,
+            require_digit:     document.getElementById('require_digit').checked,
+            require_special:   document.getElementById('require_special').checked,
+        };
+
+        const res = await apiCall('/admin/password-policy', {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        });
+
+        if (res && res.ok) {
+            setStatus('보안 정책이 저장되었습니다.', true);
+        } else {
+            const err = await res?.json().catch(() => ({}));
+            setStatus(err.detail || '저장 중 오류가 발생했습니다.', false);
+        }
+    }
+
+    function setStatus(msg, ok) {
+        const el = document.getElementById('statusMsg');
+        el.textContent = msg;
+        el.className   = ok ? 'msg-ok' : 'msg-err';
+    }
+
+    init();
+</script>
+</body>
+</html>

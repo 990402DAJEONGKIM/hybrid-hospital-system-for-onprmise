@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>역할/권한 관리 - MZ Clinic 관리자</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1200px; margin:80px auto 40px; padding:0 16px; }
+        .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+        .layout { display:grid; grid-template-columns:320px 1fr; gap:20px; align-items:start; }
+        @media(max-width:768px){ .layout { grid-template-columns:1fr; } }
+
+        /* 역할 목록 패널 */
+        .role-list { background:#fff; border-radius:10px; border:1px solid #e0e0e0; overflow:hidden; }
+        .role-list-header { background:#eceff1; padding:12px 16px; font-size:13px; font-weight:700; color:#546e7a; border-bottom:1px solid #e0e0e0; }
+        .role-item { padding:13px 16px; border-bottom:1px solid #f0f0f0; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:background .15s; }
+        .role-item:last-child { border-bottom:none; }
+        .role-item:hover { background:#f5f5f5; }
+        .role-item.selected { background:#e3f2fd; }
+        .role-item .role-name { font-weight:600; font-size:14px; color:#263238; }
+        .role-item .role-code { font-size:11px; color:#90a4ae; font-family:monospace; }
+        .role-item .perm-count { font-size:12px; color:#78909c; background:#eceff1; padding:2px 8px; border-radius:10px; }
+
+        /* 편집 패널 */
+        .perm-panel { background:#fff; border-radius:10px; border:1px solid #e0e0e0; }
+        .perm-panel-header { background:#eceff1; padding:12px 16px; font-size:13px; font-weight:700; color:#546e7a; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+        .perm-panel-body { padding:16px; }
+
+        /* 탭 */
+        .tab-bar { display:flex; border-bottom:2px solid #e0e0e0; margin-bottom:16px; }
+        .tab-btn { padding:9px 22px; border:none; background:none; font-size:13px; font-weight:600; color:#90a4ae; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; }
+        .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+        .tab-panel { display:none; }
+        .tab-panel.active { display:block; }
+
+        .perm-category { margin-bottom:20px; }
+        .perm-category-title { font-size:12px; font-weight:700; color:#90a4ae; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #f0f0f0; }
+        .perm-item { display:flex; align-items:center; gap:10px; padding:7px 4px; border-radius:6px; }
+        .perm-item:hover { background:#f9f9f9; }
+        .perm-item input[type="checkbox"] { width:16px; height:16px; cursor:pointer; accent-color:var(--primary); }
+        .perm-item label { font-size:14px; color:#37474f; cursor:pointer; flex:1; }
+        .perm-item .perm-code { font-family:monospace; font-size:11px; color:#90a4ae; }
+        .empty-select { text-align:center; padding:60px 20px; color:#90a4ae; font-size:14px; }
+
+        /* 모달 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.open { display:flex; }
+        .modal-box { background:#fff; border-radius:10px; padding:28px; width:400px; max-width:95vw; }
+        .modal-box h3 { margin:0 0 20px; font-size:16px; }
+        .form-group { margin-bottom:14px; }
+        .form-group label { display:block; font-size:13px; font-weight:600; color:#546e7a; margin-bottom:5px; }
+        .form-group input, .form-group textarea { width:100%; padding:9px 11px; border:1px solid #cfd8dc; border-radius:6px; font-size:14px; box-sizing:border-box; }
+        .modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+
+        .btn-primary  { padding:9px 18px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+        .btn-secondary { padding:9px 18px; background:#eceff1; color:#546e7a; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+        .btn-save { padding:8px 20px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+        #statusMsg { font-size:13px; margin-top:8px; min-height:16px; }
+        .msg-ok  { color:#2e7d32; }
+        .msg-err { color:#c62828; }
+        .back-link { font-size:13px; color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-bottom:16px; }
+        .back-link:hover { text-decoration:underline; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <div class="toolbar">
+        <div>
+            <h2 style="margin:0 0 4px;">역할 / 권한 관리</h2>
+            <p style="color:#78909c;font-size:13px;margin:0;">역할 정의, 권한 및 메뉴 할당</p>
+        </div>
+        <button class="btn-primary" onclick="openCreateModal()"><i class="fas fa-plus mr-1"></i>새 역할 생성</button>
+    </div>
+
+    <div class="layout">
+        <!-- 역할 목록 -->
+        <div>
+            <div class="role-list">
+                <div class="role-list-header">역할 목록</div>
+                <div id="roleList"><div class="empty-select">로딩 중...</div></div>
+            </div>
+        </div>
+
+        <!-- 권한/메뉴 편집 -->
+        <div>
+            <div class="perm-panel">
+                <div class="perm-panel-header">
+                    <span id="panelTitle">역할을 선택하세요</span>
+                    <button class="btn-save" id="saveBtn" onclick="saveCurrent()" style="display:none;">저장</button>
+                </div>
+                <div class="perm-panel-body" id="permBody">
+                    <div class="empty-select"><i class="fas fa-mouse-pointer" style="font-size:24px;margin-bottom:10px;display:block;"></i>좌측에서 역할을 선택하면 편집할 수 있습니다.</div>
+                </div>
+            </div>
+            <div id="statusMsg"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 새 역할 생성 모달 -->
+<div class="modal-overlay" id="createModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-shield-alt mr-2"></i>새 역할 생성</h3>
+        <div class="form-group">
+            <label>역할 코드 (영문소문자·숫자)</label>
+            <input type="text" id="newRoleCode" placeholder="예: supervisor" pattern="[a-z0-9_]+">
+        </div>
+        <div class="form-group">
+            <label>역할명 (한국어)</label>
+            <input type="text" id="newRoleName" placeholder="예: 수퍼바이저">
+        </div>
+        <div class="form-group">
+            <label>설명 (선택)</label>
+            <input type="text" id="newRoleDesc" placeholder="역할에 대한 간략한 설명">
+        </div>
+        <div id="createErrMsg" style="color:#c62828;font-size:13px;min-height:16px;"></div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeCreateModal()">취소</button>
+            <button class="btn-primary" onclick="createRole()">생성</button>
+        </div>
+    </div>
+</div>
+
+</div>
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    let allRoles      = [];
+    let allPerms      = [];
+    let allMenus      = [];
+    let selectedRoleId = null;
+    let activeTab     = 'perm'; // 'perm' | 'menu'
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        if (me.role !== 'admin') { alert('관리자 권한이 필요합니다.'); location.href = 'index.html'; return; }
+        await Promise.all([loadRoles(), loadPermissions(), loadMenus()]);
+    }
+
+    async function loadRoles() {
+        const res = await apiCall('/admin/roles');
+        if (!res || !res.ok) return;
+        allRoles = await res.json();
+        renderRoleList();
+    }
+
+    async function loadPermissions() {
+        const res = await apiCall('/admin/permissions');
+        if (!res || !res.ok) return;
+        allPerms = await res.json();
+    }
+
+    async function loadMenus() {
+        const res = await apiCall('/admin/menus');
+        if (!res || !res.ok) return;
+        allMenus = await res.json();
+    }
+
+    function renderRoleList() {
+        const el = document.getElementById('roleList');
+        if (!allRoles.length) { el.innerHTML = '<div class="empty-select">역할 없음</div>'; return; }
+        el.innerHTML = allRoles.map(r => `
+            <div class="role-item ${selectedRoleId === r.role_id ? 'selected' : ''}"
+                 onclick="selectRole(${r.role_id})">
+                <div>
+                    <div class="role-name">${r.role_name}</div>
+                    <div class="role-code">${r.role_code}</div>
+                </div>
+                <span class="perm-count">${r.permissions.length}개</span>
+            </div>
+        `).join('');
+    }
+
+    function selectRole(roleId) {
+        selectedRoleId = roleId;
+        renderRoleList();
+        const role = allRoles.find(r => r.role_id === roleId);
+        if (!role) return;
+
+        document.getElementById('panelTitle').textContent = `"${role.role_name}" 편집`;
+        document.getElementById('saveBtn').style.display = '';
+
+        renderTabPanel(role);
+        setStatus('');
+    }
+
+    function renderTabPanel(role) {
+        const activeCodes = new Set((role.permissions || []).map(p => p.permission_code));
+        const activeMenuCodes = new Set((role.menus || []).map(m => m.menu_code));
+
+        const tabBar = `
+            <div class="tab-bar">
+                <button class="tab-btn ${activeTab === 'perm' ? 'active' : ''}" onclick="switchTab('perm')">권한</button>
+                <button class="tab-btn ${activeTab === 'menu' ? 'active' : ''}" onclick="switchTab('menu')">메뉴 할당</button>
+            </div>`;
+
+        // 권한 탭
+        const categories = [...new Set(allPerms.map(p => p.category))].filter(Boolean);
+        let permHtml = '';
+        for (const cat of categories) {
+            const perms = allPerms.filter(p => p.category === cat);
+            permHtml += `
+                <div class="perm-category">
+                    <div class="perm-category-title">${cat}</div>
+                    ${perms.map(p => `
+                        <div class="perm-item">
+                            <input type="checkbox" id="perm_${p.permission_code}"
+                                   value="${p.permission_code}"
+                                   ${activeCodes.has(p.permission_code) ? 'checked' : ''}>
+                            <label for="perm_${p.permission_code}">
+                                ${p.permission_name}
+                                <span class="perm-code">(${p.permission_code})</span>
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>`;
+        }
+
+        // 메뉴 탭
+        let menuHtml = allMenus.length
+            ? allMenus.map(m => `
+                <div class="perm-item">
+                    <input type="checkbox" id="menu_${m.menu_code}"
+                           value="${m.menu_code}"
+                           ${activeMenuCodes.has(m.menu_code) ? 'checked' : ''}>
+                    <label for="menu_${m.menu_code}">
+                        ${m.menu_name}
+                        <span class="perm-code">${m.menu_url || ''}</span>
+                    </label>
+                </div>`).join('')
+            : '<div class="empty-select" style="padding:20px;">등록된 메뉴가 없습니다.</div>';
+
+        document.getElementById('permBody').innerHTML = `
+            ${tabBar}
+            <div class="tab-panel ${activeTab === 'perm' ? 'active' : ''}" id="tabPerm">
+                ${permHtml || '<div class="empty-select">권한 데이터 없음</div>'}
+            </div>
+            <div class="tab-panel ${activeTab === 'menu' ? 'active' : ''}" id="tabMenu">
+                ${menuHtml}
+            </div>`;
+    }
+
+    function switchTab(tab) {
+        activeTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b =>
+            b.classList.toggle('active', b.textContent.trim() === (tab === 'perm' ? '권한' : '메뉴 할당'))
+        );
+        document.getElementById('tabPerm').classList.toggle('active', tab === 'perm');
+        document.getElementById('tabMenu').classList.toggle('active', tab === 'menu');
+    }
+
+    async function saveCurrent() {
+        if (!selectedRoleId) return;
+        if (activeTab === 'perm') {
+            await savePermissions();
+        } else {
+            await saveMenus();
+        }
+    }
+
+    async function savePermissions() {
+        const checked = [...document.querySelectorAll('#tabPerm input[type="checkbox"]:checked')]
+            .map(cb => cb.value);
+        const res = await apiCall(`/admin/roles/${selectedRoleId}/permissions`, {
+            method: 'PUT',
+            body:   JSON.stringify({ permission_codes: checked }),
+        });
+        if (res && res.ok) {
+            setStatus('권한이 저장되었습니다.', true);
+            await loadRoles();
+        } else {
+            const err = await res?.json().catch(() => ({}));
+            setStatus(err.detail || '저장 중 오류가 발생했습니다.', false);
+        }
+    }
+
+    async function saveMenus() {
+        const checked = [...document.querySelectorAll('#tabMenu input[type="checkbox"]:checked')]
+            .map(cb => cb.value);
+        const res = await apiCall(`/admin/roles/${selectedRoleId}/menus`, {
+            method: 'PATCH',
+            body:   JSON.stringify({ menu_codes: checked }),
+        });
+        if (res && res.ok) {
+            setStatus('메뉴 할당이 저장되었습니다.', true);
+            await loadRoles();
+        } else {
+            const err = await res?.json().catch(() => ({}));
+            setStatus(err.detail || '저장 중 오류가 발생했습니다.', false);
+        }
+    }
+
+    function openCreateModal() {
+        document.getElementById('newRoleCode').value = '';
+        document.getElementById('newRoleName').value = '';
+        document.getElementById('newRoleDesc').value = '';
+        document.getElementById('createErrMsg').textContent = '';
+        document.getElementById('createModal').classList.add('open');
+    }
+
+    function closeCreateModal() {
+        document.getElementById('createModal').classList.remove('open');
+    }
+
+    async function createRole() {
+        const code  = document.getElementById('newRoleCode').value.trim();
+        const name  = document.getElementById('newRoleName').value.trim();
+        const desc  = document.getElementById('newRoleDesc').value.trim();
+        const errEl = document.getElementById('createErrMsg');
+
+        if (!code || !name) { errEl.textContent = '역할 코드와 역할명을 입력해주세요.'; return; }
+        if (!/^[a-z0-9_]+$/.test(code)) { errEl.textContent = '역할 코드는 영문 소문자·숫자·_ 만 사용 가능합니다.'; return; }
+
+        const res = await apiCall('/admin/roles', {
+            method: 'POST',
+            body:   JSON.stringify({ role_code: code, role_name: name, description: desc || null }),
+        });
+        if (res && res.ok) {
+            closeCreateModal();
+            await loadRoles();
+            setStatus('새 역할이 생성되었습니다.', true);
+        } else {
+            const err = await res?.json().catch(() => ({}));
+            errEl.textContent = err.detail || '생성 중 오류가 발생했습니다.';
+        }
+    }
+
+    function setStatus(msg, ok) {
+        const el = document.getElementById('statusMsg');
+        el.textContent = msg;
+        el.className = ok ? 'msg-ok' : (msg ? 'msg-err' : '');
+    }
+
+    init();
+</script>
+</body>
+</html>

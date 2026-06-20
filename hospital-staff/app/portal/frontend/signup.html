@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입 - 김이박 종합병원</title>
+    <link rel="stylesheet" href="/css/tailwind.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4 sm:p-8">
+    <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xl w-full max-w-md my-auto">
+        <div class="text-center mb-4 sm:mb-5">
+            <h1 class="text-2xl sm:text-3xl font-bold text-blue-900 mb-1">회원가입</h1>
+            <p class="text-xs text-gray-500">병원 시스템 이용을 위한 정보를 입력해주세요.</p>
+        </div>
+
+        <form id="signupForm" class="space-y-2.5">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">성함</label>
+                <input type="text" id="userName" required
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">이메일 (로그인 아이디)</label>
+                <input type="email" id="userEmail" required placeholder="example@email.com"
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">비밀번호</label>
+                <input type="password" id="userPw" required
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                <p id="pwHint" class="text-[10px] text-gray-400 mt-1">영문·숫자·특수문자 중 2종류 이상 조합, 10자 이상 (3종류 이상 조합 시 8자 이상)</p>
+                <p id="pwError" class="text-[10px] text-red-500 mt-1 hidden"></p>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">생년월일</label>
+                    <input type="date" id="userBirth" required
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">성별</label>
+                    <select id="userGender" required
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <option value="">선택</option>
+                        <option value="M">남성</option>
+                        <option value="F">여성</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">연락처</label>
+                <input type="tel" id="userContact" placeholder="010-1234-5678" required
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            </div>
+
+            <div class="mt-2">
+                <label class="block text-xs font-medium text-gray-700 mb-1">개인정보 수집 및 이용 동의</label>
+                <div class="w-full h-16 p-2 text-[10px] text-gray-600 border border-gray-200 rounded-lg bg-gray-50 overflow-y-auto mb-2 leading-tight">
+                    [개인정보 수집 및 이용 안내]<br>
+                    1. 수집 항목: 성함, 이메일, 비밀번호<br>
+                    2. 이용 목적: 회원 식별 및 병원 서비스(예약, 조회 등) 제공<br>
+                    3. 보유 및 이용 기간: 회원 탈퇴 시까지<br>
+                    * 귀하는 동의를 거부할 권리가 있으나, 거부 시 서비스 이용이 제한됩니다.
+                </div>
+                <label class="flex items-center text-xs text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="privacyConsent" class="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    위의 내용에 동의합니다. (필수)
+                </label>
+            </div>
+
+            <div id="apiError" class="hidden p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600"></div>
+
+            <button type="submit" id="submitBtn"
+                class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                가입하기
+            </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-gray-600">
+            이미 계정이 있으신가요?
+            <a href="login.html" class="text-blue-600 font-bold hover:underline">로그인</a>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+
+        function validatePassword(password) {
+            const hasUpper   = /[A-Z]/.test(password);
+            const hasLower   = /[a-z]/.test(password);
+            const hasDigit   = /\d/.test(password);
+            const hasSpecial = /[!@#$%^&*()\-_=+\[\]{};:'",.<>?/\\|`~]/.test(password);
+            const kinds = [hasUpper, hasLower, hasDigit, hasSpecial].filter(Boolean).length;
+
+            if (password.length < 8) return '8자 이상 입력해주세요.';
+            if (kinds < 2) return '영문·숫자·특수문자 중 2종류 이상을 포함해야 합니다.';
+            if (kinds === 2 && password.length < 10) return '2종류 조합 시 10자 이상 입력해주세요.';
+            return null;
+        }
+
+        // 비밀번호 실시간 유효성 검사
+        document.getElementById('userPw').addEventListener('input', (e) => {
+            const error = validatePassword(e.target.value);
+            const pwError = document.getElementById('pwError');
+            const pwHint = document.getElementById('pwHint');
+            if (error) {
+                pwError.textContent = error;
+                pwError.classList.remove('hidden');
+                pwHint.classList.add('hidden');
+            } else {
+                pwError.classList.add('hidden');
+                pwHint.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name    = document.getElementById('userName').value.trim();
+            const email   = document.getElementById('userEmail').value.trim();
+            const pw      = document.getElementById('userPw').value;
+            const birth   = document.getElementById('userBirth').value;
+            const gender  = document.getElementById('userGender').value;
+            const contact = document.getElementById('userContact').value.trim();
+            const consent = document.getElementById('privacyConsent').checked;
+            const apiErrorEl = document.getElementById('apiError');
+            const submitBtn  = document.getElementById('submitBtn');
+
+            apiErrorEl.classList.add('hidden');
+
+            if (!consent) {
+                alert('개인정보 수집 및 이용에 동의해 주세요.');
+                return;
+            }
+
+            const pwValidationError = validatePassword(pw);
+            if (pwValidationError) {
+                document.getElementById('pwError').textContent = pwValidationError;
+                document.getElementById('pwError').classList.remove('hidden');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '처리 중...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY,
+                    },
+                    body: JSON.stringify({
+                        email,
+                        password: pw,
+                        name,
+                        birth_date: birth,
+                        phone: contact,
+                        gender_code: gender,
+                    }),
+                });
+
+                const data = await res.json();
+
+                if (res.status === 201) {
+                    if (data.is_pending) {
+                        alert('계정이 생성되었습니다. 병원 첫 방문 시 접수 후 진료 이력이 자동으로 연결됩니다.');
+                    } else {
+                        alert('계정이 생성되었습니다.');
+                    }
+                    window.location.href = 'login.html';
+                } else {
+                    // 400, 422 등 오류 처리
+                    const message = data.detail || '회원가입 중 오류가 발생했습니다.';
+                    apiErrorEl.textContent = message;
+                    apiErrorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                apiErrorEl.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+                apiErrorEl.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '가입하기';
+            }
+        });
+    </script>
+</body>
+</html>
