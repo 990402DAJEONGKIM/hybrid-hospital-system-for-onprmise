@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>직원 로그인 - 김이박 클리닉</title>
+    <link rel="stylesheet" href="/css/tailwind.min.css">
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 100%);
+            min-height: 100vh;
+        }
+        .login-card {
+            border-top: 4px solid #1d4ed8;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+        }
+        .login-btn {
+            background: #1d3a6e;
+            transition: background 0.2s;
+        }
+        .login-btn:hover { background: #1e40af; }
+        .security-badge {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+        }
+    </style>
+</head>
+<body style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:1rem;">
+
+    <div class="w-full max-w-md">
+
+        <!-- 로고 영역 -->
+        <div class="text-center mb-4">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white bg-opacity-10 mb-2">
+                <i class="fas fa-shield-alt text-2xl text-blue-300"></i>
+            </div>
+            <h1 class="text-xl font-bold text-white">김이박 클리닉</h1>
+            <p class="text-xs text-blue-300 mt-0.5 font-medium tracking-widest uppercase">직원 전용 시스템</p>
+        </div>
+
+        <!-- 카드 -->
+        <div class="login-card bg-white rounded-2xl p-6">
+
+            <!-- 1단계: 로그인 폼 -->
+            <form id="loginForm" class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">회원번호</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                            <i class="fas fa-id-card text-sm"></i>
+                        </span>
+                        <input type="text" id="loginMemberNumber" required placeholder="회원번호 입력" autocomplete="username"
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-700 outline-none bg-gray-50 focus:bg-white transition text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                            <i class="fas fa-lock text-sm"></i>
+                        </span>
+                        <input type="password" id="loginPw" required
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-700 outline-none bg-gray-50 focus:bg-white transition text-sm">
+                    </div>
+                </div>
+
+                <div id="apiError" style="display:none;" class="p-2.5 bg-red-50 border border-red-300 rounded-xl text-xs text-red-700 items-center gap-2">
+                    <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+                    <span id="apiErrorMsg"></span>
+                </div>
+
+                <button type="submit" id="submitBtn"
+                    class="login-btn w-full text-white py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                    <i class="fas fa-sign-in-alt mr-2"></i>로그인
+                </button>
+            </form>
+
+            <!-- 2단계: MFA 입력 폼 (mfa_required=true 시 표시) -->
+            <form id="mfaForm" class="hidden space-y-3">
+                <div class="text-center mb-2">
+                    <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 mb-2">
+                        <i class="fas fa-mobile-alt text-blue-600"></i>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-700">2단계 인증</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Google Authenticator 앱의 6자리 코드를 입력하세요.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">인증 코드</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                            <i class="fas fa-key text-sm"></i>
+                        </span>
+                        <input type="text" id="mfaCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                            placeholder="6자리 코드 입력" autocomplete="one-time-code"
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-700 outline-none bg-gray-50 focus:bg-white transition text-sm tracking-widest text-center font-mono">
+                    </div>
+                </div>
+
+                <div id="mfaError" style="display:none;" class="p-2.5 bg-red-50 border border-red-300 rounded-xl text-xs text-red-700 items-center gap-2">
+                    <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+                    <span id="mfaErrorMsg"></span>
+                </div>
+
+                <button type="submit" id="mfaSubmitBtn"
+                    class="login-btn w-full text-white py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                    <i class="fas fa-check-circle mr-2"></i>인증 확인
+                </button>
+                <button type="button" id="mfaBackBtn"
+                    class="w-full py-2 text-xs text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-arrow-left mr-1"></i>로그인으로 돌아가기
+                </button>
+            </form>
+
+            <!-- 직원용 안내 -->
+            <div class="mt-4 pt-3 border-t border-gray-100">
+                <p class="text-xs text-gray-400 text-center leading-relaxed">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    계정 발급 및 비밀번호 초기화는 IT 지원팀에 문의하세요.<br>
+                    로그인 5회 실패 시 계정이 잠깁니다.
+                </p>
+            </div>
+        </div>
+
+        <!-- 하단 -->
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        // 온프레미스 전용 로그인 — by 김다정, 2026-06-14
+        // AWS 해시 토큰 자동 승계 제거: AWS 로그인 후 이 페이지로 이동해도 항상 ID/PW 재입력
+
+        async function redirectAfterLogin() {
+            const meRes = await fetch(`${BASE_URL}/auth/me`, { credentials: 'include' });
+            if (!meRes.ok) throw new Error('사용자 정보를 불러올 수 없습니다.');
+            const meData = await meRes.json();
+            if (meData.must_change_password || meData.password_expired) {
+                window.location.href = 'change-password.html';
+                return;
+            }
+            if (!meData.mfa_enabled) {
+                window.location.href = 'mfa-setup.html';
+                return;
+            }
+            window.location.href = 'index.html';
+        }
+
+        // 1단계: ID/PW 로그인
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const memberNumber = document.getElementById('loginMemberNumber').value.trim();
+            const pw           = document.getElementById('loginPw').value;
+            const errorBox     = document.getElementById('apiError');
+            const errorMsg     = document.getElementById('apiErrorMsg');
+            const submitBtn    = document.getElementById('submitBtn');
+
+            errorBox.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>확인 중...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ member_number: memberNumber, password: pw }),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    if (data.mfa_required) {
+                        document.getElementById('loginForm').classList.add('hidden');
+                        document.getElementById('mfaForm').classList.remove('hidden');
+                        document.getElementById('mfaCode').focus();
+                    } else {
+                        await redirectAfterLogin();
+                    }
+                } else {
+                    errorMsg.textContent = data.detail || '로그인 중 오류가 발생했습니다.';
+                    errorBox.style.display = 'flex';
+                }
+            } catch {
+                errorMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+                errorBox.style.display = 'flex';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i>로그인';
+            }
+        });
+
+        // 2단계: TOTP 코드 검증
+        document.getElementById('mfaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const code         = document.getElementById('mfaCode').value.trim();
+            const errorBox     = document.getElementById('mfaError');
+            const errorMsg     = document.getElementById('mfaErrorMsg');
+            const submitBtn    = document.getElementById('mfaSubmitBtn');
+
+            errorBox.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>확인 중...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/auth/mfa/verify`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code }),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    await redirectAfterLogin();
+                } else {
+                    errorMsg.textContent = data.detail || '인증 코드가 올바르지 않습니다.';
+                    errorBox.style.display = 'flex';
+                    document.getElementById('mfaCode').value = '';
+                    document.getElementById('mfaCode').focus();
+                }
+            } catch {
+                errorMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+                errorBox.style.display = 'flex';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>인증 확인';
+            }
+        });
+
+        // 로그인 화면으로 돌아가기
+        document.getElementById('mfaBackBtn').addEventListener('click', () => {
+            document.getElementById('mfaForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('mfaCode').value = '';
+            document.getElementById('mfaError').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>진료 등록 — 김이박 병원</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:640px; margin:80px auto 40px; padding:0 16px; }
+        .form-card { background:#fff; border-radius:12px; padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+        .form-group { margin-bottom:18px; }
+        .form-group label { display:block; font-size:13px; font-weight:700; color:#546e7a; margin-bottom:6px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width:100%; padding:10px 12px; border:1px solid #cfd8dc; border-radius:6px;
+            font-size:14px; box-sizing:border-box;
+        }
+        .form-group textarea { height:90px; resize:vertical; }
+        .patient-info { background:#f5f7fa; border-radius:8px; padding:12px 16px; margin-bottom:20px; font-size:14px; color:#374151; }
+        .patient-info strong { display:block; font-size:15px; margin-bottom:4px; }
+        .btn-submit { width:100%; padding:12px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; }
+        .btn-submit:hover { background:#047857; }
+        #statusMsg { margin-top:14px; padding:10px 14px; border-radius:6px; font-size:14px; display:none; }
+        .msg-ok  { background:#d1fae5; color:#065f46; }
+        .msg-err { background:#fee2e2; color:#991b1b; }
+        .back-link { font-size:13px; color:var(--primary,#1e88e5); text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-bottom:16px; }
+        .back-link:hover { text-decoration:underline; }
+        .isms-notice { background:#fff8e1; border:1px solid #f59e0b; border-radius:6px; padding:10px 16px; font-size:12px; color:#92400e; margin-bottom:18px; }
+
+        /* 접수 유형 탭 */
+        .type-tabs { display:flex; gap:0; margin-bottom:20px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; }
+        .type-tab { flex:1; padding:10px; text-align:center; font-size:14px; font-weight:600; cursor:pointer; background:#f8fafc; color:#94a3b8; border:none; transition:background .15s; }
+        .type-tab.active { background:#059669; color:#fff; }
+
+        /* 경고 배너 */
+        .warn-box { background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; padding:10px 14px; font-size:12px; color:#92400e; margin-bottom:14px; display:none; }
+        .warn-box i { margin-right:5px; }
+
+        /* Walk-in 배지 */
+        .walkin-badge { display:inline-block; background:#dbeafe; color:#1d4ed8; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; margin-left:8px; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <a class="back-link" href="patient-search.html"><i class="fas fa-arrow-left"></i> 환자 검색으로 돌아가기</a>
+    <h2 style="margin-bottom:4px;">진료 등록 <span id="walkinBadge" class="walkin-badge" style="display:none;">Walk-in</span></h2>
+    <p style="color:#78909c;font-size:13px;margin-bottom:14px;">외래·입원 접수 처리 — 원무과·관리자 전용</p>
+
+    <div class="isms-notice">
+        <i class="fas fa-lock" style="margin-right:6px;"></i>
+        진료 등록은 <strong>감사 로그(ENCOUNTER_CHECKIN / ENCOUNTER_ADMIT)</strong>에 기록됩니다. 주호소는 1등급 데이터입니다.
+    </div>
+
+    <!-- 접수 유형 선택 -->
+    <div class="type-tabs">
+        <button class="type-tab active" id="tabOutpatient" onclick="setEncType('outpatient')">
+            <i class="fas fa-stethoscope" style="margin-right:5px;"></i>외래 접수
+        </button>
+        <button class="type-tab" id="tabInpatient" onclick="setEncType('inpatient')">
+            <i class="fas fa-hospital-user" style="margin-right:5px;"></i>입원 접수
+        </button>
+    </div>
+
+    <div class="form-card">
+        <div class="patient-info">
+            <strong id="patientNameDisplay">환자 정보 로딩 중...</strong>
+            <span id="patientIdDisplay" style="font-size:12px;color:#78909c;"></span>
+        </div>
+
+        <!-- 입원 병상 경고 -->
+        <div class="warn-box" id="wardWarnBox">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="wardWarnText">병상 정보를 확인 중입니다...</span>
+        </div>
+
+        <form id="encounterForm" onsubmit="submitEncounter(event)">
+            <div class="form-group">
+                <label>진료과 <span style="color:#e53935;">*</span></label>
+                <select id="departmentCode" required onchange="loadDoctors()">
+                    <option value="">선택하세요</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>담당 의사 <span style="color:#e53935;">*</span></label>
+                <select id="doctorId" required>
+                    <option value="">진료과 선택 후</option>
+                </select>
+            </div>
+
+            <!-- 입원 병동 선택 -->
+            <div id="wardGroup" style="display:none;">
+                <div class="form-group">
+                    <label>병동 <span style="color:#e53935;">*</span></label>
+                    <select id="wardId">
+                        <option value="">로딩 중...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>주호소 (Chief Complaint) <span style="color:#e53935;font-size:11px;">1등급 데이터</span></label>
+                <textarea id="chiefComplaint" placeholder="환자 호소 증상을 입력하세요."></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <i class="fas fa-save" style="margin-right:6px;"></i><span id="submitLabel">외래 접수</span>
+            </button>
+        </form>
+
+        <div id="statusMsg"></div>
+    </div>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    const params     = new URLSearchParams(window.location.search);
+    const patientId  = params.get('pid');
+    const apptId     = params.get('appt_id');
+    const isWalkin   = !apptId;
+
+    let _encType = 'outpatient';
+    let _wards   = [];
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+
+        if (!['nurse', 'admin'].includes(me.role)) {
+            alert('원무과·관리자만 진료를 등록할 수 있습니다.');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        if (!patientId) {
+            alert('환자 정보가 없습니다. 환자 검색 화면으로 이동합니다.');
+            window.location.href = 'patient-search.html';
+            return;
+        }
+
+        if (isWalkin) {
+            document.getElementById('walkinBadge').style.display = '';
+        }
+
+        // 환자 이름 (마스킹)
+        const pRes = await apiCall(`/emr/patients/${patientId}`);
+        if (pRes?.ok) {
+            const p = await pRes.json();
+            const masked = p.patient_name ? p.patient_name[0] + '●'.repeat(Math.max(p.patient_name.length - 1, 1)) : '환자';
+            document.getElementById('patientNameDisplay').textContent = masked;
+        } else {
+            document.getElementById('patientNameDisplay').textContent = '환자';
+        }
+        document.getElementById('patientIdDisplay').textContent = `ID: ${patientId.slice(0,8)}…`;
+
+        await loadDepartments();
+        await loadWards();
+    }
+
+    function setEncType(type) {
+        _encType = type;
+        document.getElementById('tabOutpatient').className = 'type-tab' + (type === 'outpatient' ? ' active' : '');
+        document.getElementById('tabInpatient').className  = 'type-tab' + (type === 'inpatient'  ? ' active' : '');
+        document.getElementById('wardGroup').style.display = type === 'inpatient' ? '' : 'none';
+        document.getElementById('submitLabel').textContent = type === 'inpatient' ? '입원 접수' : '외래 접수';
+        if (type === 'inpatient') checkWardAvailability();
+        else document.getElementById('wardWarnBox').style.display = 'none';
+    }
+
+    async function loadDepartments() {
+        const res = await apiCall('/emr/departments');
+        if (!res || !res.ok) return;
+        const depts = await res.json();
+        const sel = document.getElementById('departmentCode');
+        depts.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.department_code;
+            opt.textContent = d.department_name;
+            sel.appendChild(opt);
+        });
+        sel.addEventListener('change', loadDoctors);
+    }
+
+    async function loadDoctors() {
+        const deptCode = document.getElementById('departmentCode').value;
+        const url = deptCode ? `/emr/doctors?department_code=${deptCode}` : '/emr/doctors';
+        const res = await apiCall(url);
+        const sel = document.getElementById('doctorId');
+        sel.innerHTML = '<option value="">선택하세요</option>';
+        if (!res || !res.ok) return;
+        const doctors = await res.json();
+        doctors.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.doctor_id;
+            opt.textContent = d.doctor_name;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function loadWards() {
+        const res = await apiCall('/portal/doctor/staff/wards');
+        if (!res || !res.ok) return;
+        _wards = await res.json();
+        const sel = document.getElementById('wardId');
+        sel.innerHTML = '<option value="">선택하세요 (선택)</option>';
+        _wards.forEach(w => {
+            const isFull = w.available_beds <= 0;
+            const opt = document.createElement('option');
+            opt.value = w.ward_id;
+            opt.textContent = `${w.ward_name} (가용: ${w.available_beds}/${w.total_beds})`;
+            if (isFull) { opt.disabled = true; opt.textContent += ' — 만실'; }
+            sel.appendChild(opt);
+        });
+    }
+
+    async function checkWardAvailability() {
+        const warnBox = document.getElementById('wardWarnBox');
+        const warnText = document.getElementById('wardWarnText');
+        const totalAvail = _wards.reduce((s, w) => s + (w.available_beds || 0), 0);
+        if (totalAvail === 0) {
+            warnText.textContent = '⚠ 현재 가용 병상이 없습니다. 입원 접수가 차단됩니다.';
+            warnBox.style.display = '';
+        } else {
+            warnText.textContent = `가용 병상 합계: ${totalAvail}개`;
+            warnBox.style.display = '';
+        }
+    }
+
+    async function submitEncounter(e) {
+        e.preventDefault();
+        const msgEl = document.getElementById('statusMsg');
+        msgEl.style.display = 'none';
+
+        const deptCode = document.getElementById('departmentCode').value;
+        const doctorId = document.getElementById('doctorId').value;
+
+        if (!deptCode || !doctorId) {
+            msgEl.textContent = '진료과와 담당 의사를 선택해 주세요.';
+            msgEl.className = 'msg-err';
+            msgEl.style.display = 'block';
+            return;
+        }
+
+        // 입원 접수 시 병상 확인
+        if (_encType === 'inpatient') {
+            const totalAvail = _wards.reduce((s, w) => s + (w.available_beds || 0), 0);
+            if (totalAvail === 0) {
+                msgEl.textContent = '가용 병상이 없어 입원 접수가 불가합니다.';
+                msgEl.className = 'msg-err';
+                msgEl.style.display = 'block';
+                return;
+            }
+        }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+
+        const body = {
+            patient_id:      patientId,
+            doctor_id:       doctorId,
+            department_code: deptCode,
+            chief_complaint: document.getElementById('chiefComplaint').value.trim() || null,
+        };
+        if (apptId) body.appointment_id = apptId;
+
+        let endpoint;
+        if (_encType === 'inpatient') {
+            const wardId = document.getElementById('wardId').value;
+            if (wardId) body.ward_id = wardId;
+            endpoint = '/emr/nurse/encounters/admit';
+        } else {
+            endpoint = '/emr/nurse/encounters/checkin';
+        }
+
+        try {
+            const res = await apiCall(endpoint, {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+
+            if (!res) return;
+
+            // 예약 환자 접수 완료 시 예약 상태 업데이트
+            if (res.ok && apptId) {
+                try {
+                    await apiCall(`/portal/doctor/staff/appointments/${apptId}/status`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ status_code: 'confirmed', reason: '진료 접수 완료' }),
+                    });
+                } catch {}
+            }
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                msgEl.textContent   = `오류: ${err.detail || '등록에 실패했습니다.'}`;
+                msgEl.className     = 'msg-err';
+                msgEl.style.display = 'block';
+                return;
+            }
+
+            const data = await res.json();
+            const typeLabel = _encType === 'inpatient' ? '입원' : '외래';
+            msgEl.textContent   = `${typeLabel} 접수 완료 (진료 ID: ${data.encounter_id?.slice(0,8)}…)`;
+            msgEl.className     = 'msg-ok';
+            msgEl.style.display = 'block';
+            document.getElementById('encounterForm').reset();
+
+            setTimeout(() => { window.location.href = 'patient-search.html'; }, 2000);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

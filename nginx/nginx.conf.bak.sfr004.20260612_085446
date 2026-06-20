@@ -1,0 +1,225 @@
+events {}
+http {
+    include      /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+    gzip on;
+    server_tokens off;
+
+    # ── Rate Limiting ─────────────────────────────────────────
+    limit_req_zone $binary_remote_addr zone=api_limit:10m  rate=30r/m;
+    limit_req_zone $binary_remote_addr zone=sync_limit:10m rate=10r/m;
+    limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=10r/m;
+    limit_req_zone $binary_remote_addr zone=login_limit:10m rate=5r/m;
+    limit_req_status 429;
+
+    # ── upstream 정의 ─────────────────────────────────────────
+    upstream deident_api {
+        server 127.0.0.1:8000;
+    }
+    upstream his_api {
+        server 127.0.0.1:8001;
+    }
+    upstream combined_api {
+        server 127.0.0.1:8002;
+    }
+
+    # ── HTTP → HTTPS 리다이렉트 ───────────────────────────────
+    server {
+        listen 80;
+        server_name staff.mzclinic.cloud 172.30.1.76;
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name staff.mzclinic.cloud 172.30.1.76;
+
+        ssl_certificate     /etc/nginx/certs/server.crt;
+        ssl_certificate_key /etc/nginx/certs/server.key;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+
+        access_log /var/log/nginx/access.log;
+        error_log  /var/log/nginx/error.log warn;
+
+        # 보안 헤더
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+        # ── 정적 파일 (staff 프론트엔드) ──────────────────────
+        root /usr/share/nginx/html/staff;
+
+        location ~* \.html$ {
+            add_header Cache-Control "no-cache, must-revalidate";
+            expires 0;
+        }
+        location ~* \.(css|js)$ {
+            add_header Cache-Control "no-cache, must-revalidate";
+            expires 0;
+        }
+        location ~* \.(ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf)$ {
+            expires 7d;
+            add_header Cache-Control "public";
+        }
+
+        # ── 내부 전용 (신원 확인) — his-api ──────────────────
+        location /internal/ {
+            allow 172.30.0.0/16;
+            allow 127.0.0.1;
+            deny  all;
+            proxy_pass http://his_api;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+        }
+
+        # ── staff 인증 — combined-api ─────────────────────────
+        location = /api/staff/auth/login {
+            limit_req zone=login_limit burst=5 nodelay;
+            proxy_pass http://combined_api/staff/auth/login;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        location = /api/portal/auth/login {
+            limit_req zone=login_limit burst=5 nodelay;
+            proxy_pass http://combined_api/portal/auth/login;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        # ── staff API — combined-api ──────────────────────────
+        location /api/staff/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            proxy_pass http://combined_api/staff/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        location /api/portal/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            proxy_pass http://combined_api/portal/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        location /staff/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            proxy_pass http://combined_api/staff/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        location /portal/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            proxy_pass http://combined_api/portal/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        location = /auth/login {
+            limit_req zone=auth_limit burst=5 nodelay;
+            proxy_pass http://combined_api/staff/auth/login;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+        location /auth/ {
+            proxy_pass http://combined_api/staff/auth/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+
+        location /emr/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            proxy_pass http://combined_api/staff/emr/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        location /patient/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            proxy_pass http://combined_api/patient/;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-API-Key         ${NGINX_API_KEY};
+        }
+
+        # ── 동기화 API — deidentification-api ────────────────
+        location /sync/ {
+            limit_req zone=sync_limit burst=5 nodelay;
+            proxy_pass http://deident_api;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+        }
+
+        # ── 헬스체크 ─────────────────────────────────────────
+        location = /health {
+            proxy_pass http://deident_api;
+            proxy_set_header Host $host;
+        }
+
+        location = /his/health {
+            proxy_pass http://his_api/health;
+            proxy_set_header Host $host;
+        }
+
+        location = /combined/health {
+            proxy_pass http://combined_api/health;
+            proxy_set_header Host $host;
+        }
+
+        # ── 정적 파일 fallback ────────────────────────────────
+        location /admin/ {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /admin/index.html;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        location ~ /\. {
+            deny all;
+        }
+    }
+}

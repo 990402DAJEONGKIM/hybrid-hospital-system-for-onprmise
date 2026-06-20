@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>병동 현황 - MZ Clinic</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1100px; margin:80px auto 40px; padding:0 16px; }
+        .ward-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-top:20px; }
+        .ward-card { border:1px solid #e0e0e0; border-radius:10px; padding:18px 20px; background:#fff; position:relative; }
+        .ward-card.is-full { border-color:#fca5a5; background:#fff5f5; }
+        .ward-card h3 { font-size:15px; font-weight:700; color:#263238; margin-bottom:2px; display:flex; align-items:center; gap:8px; }
+        .ward-type { font-size:12px; color:#78909c; margin-bottom:14px; }
+        .full-badge { background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; }
+        .bed-row { display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:8px; }
+        .bed-avail { font-size:24px; font-weight:700; color:var(--primary); }
+        .bed-avail.zero { color:#ef4444; }
+        .bed-total { font-size:13px; color:#78909c; }
+        .progress-wrap { background:#e0e0e0; border-radius:4px; height:8px; overflow:hidden; }
+        .progress-bar { height:100%; border-radius:4px; transition:width .3s; }
+        .progress-full { background:#e53935; }
+        .progress-high { background:#ff9800; }
+        .progress-ok   { background:#4caf50; }
+        .occupied-label { font-size:11px; color:#546e7a; margin-top:4px; }
+        .synced-label { font-size:10px; color:#94a3b8; margin-top:8px; border-top:1px dashed #e2e8f0; padding-top:6px; }
+        .empty-msg { text-align:center; padding:40px; color:#90a4ae; }
+        .refresh-btn { padding:8px 18px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:14px; cursor:pointer; }
+        .back-link { font-size:13px; color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-bottom:12px; }
+        .back-link:hover { text-decoration:underline; }
+        .card-actions { display:flex; gap:8px; margin-top:12px; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+<div class="page-wrap">
+    <!-- <a class="back-link" href="index.html"><i class="fas fa-arrow-left"></i> 대시보드</a> -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <!-- <h2>병동 현황</h2> -->
+        <h2 style="margin-bottom:4px;font-size:20px;font-weight:800;color:#1e293b;" id="pageTitle">병동 현황</h2>
+        <button class="refresh-btn" onclick="load()"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>새로고침</button>
+    </div>
+    <p style="color:#78909c;font-size:13px;margin-bottom:2px;">병동별 가용 병상 현황입니다. </p> <br>
+    <div id="syncTime" class="synced-label" style="margin-top:6px;margin-bottom:0;border-top:none;padding-top:0;"></div>
+    <div class="ward-grid" id="wardGrid"></div>
+</div>
+</div>
+
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        await load();
+    }
+
+    async function load() {
+        const res = await apiCall('/portal/doctor/staff/wards');
+        if (!res || !res.ok) {
+            document.getElementById('wardGrid').innerHTML = '<p class="empty-msg">병동 정보를 불러오지 못했습니다.</p>';
+            return;
+        }
+        const wards = await res.json();
+        const latestSync = wards.reduce((max, w) => w.synced_at && w.synced_at > max ? w.synced_at : max, '');
+        const syncLabel = latestSync ? new Date(latestSync).toLocaleString('ko-KR') : '알 수 없음';
+        document.getElementById('syncTime').innerHTML = `<i class="fas fa-sync-alt" style="margin-right:4px;"></i>동기화: ${syncLabel}`;
+        renderWards(wards);
+    }
+
+    function renderWards(wards) {
+        const grid = document.getElementById('wardGrid');
+        if (!wards.length) {
+            grid.innerHTML = '<p class="empty-msg">등록된 병동이 없습니다.</p>';
+            return;
+        }
+        grid.innerHTML = wards.map(w => {
+            const occupied = w.total_beds - w.available_beds;
+            const ratio    = w.total_beds > 0 ? occupied / w.total_beds : 0;
+            const pct      = Math.round(ratio * 100);
+            const isFull   = w.available_beds <= 0;
+            const barClass = ratio >= 1.0 ? 'progress-full' : ratio >= 0.7 ? 'progress-high' : 'progress-ok';
+            const roomType = { single:'1인실', double:'2인실', shared:'다인실' }[w.room_type] || w.room_type || '-';
+            const syncedAt = w.synced_at ? new Date(w.synced_at).toLocaleString('ko-KR') : '알 수 없음';
+            return `
+            <div class="ward-card${isFull ? ' is-full' : ''}">
+                <h3>${_esc(w.ward_name)}
+                    ${isFull ? '<span class="full-badge">만실</span>' : ''}
+                </h3>
+                <div class="ward-type">${_esc(roomType)}</div>
+                <div class="bed-row">
+                    <div>
+                        <div class="bed-avail${isFull ? ' zero' : ''}">${w.available_beds}</div>
+                        <div class="bed-total">/ ${w.total_beds} 병상</div>
+                    </div>
+                    <div style="text-align:right;font-size:13px;color:#546e7a;">사용중 ${occupied}석</div>
+                </div>
+                <div class="progress-wrap">
+                    <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+                </div>
+                <div class="occupied-label">점유율 ${pct}%</div>
+                
+                </div>`;
+        }).join('')
+    }
+
+    function _esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>입원 관리 - MZ Clinic</title>
+    <link rel="stylesheet" href="/css/fa-all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-wrap { max-width:1200px; margin:80px auto 40px; padding:0 16px; }
+
+        /* 탭 */
+        .tab-bar { display:flex; gap:0; border-bottom:2px solid #e2e8f0; margin-bottom:20px; }
+        .tab-btn { padding:10px 22px; font-size:14px; font-weight:600; color:#78909c; background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; cursor:pointer; transition:all .15s; }
+        .tab-btn.active { color:#059669; border-bottom-color:#059669; }
+        .tab-btn:hover:not(.active) { color:#374151; background:#f8fafc; }
+
+        /* 테이블 */
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .data-table th { background:#eceff1; padding:10px 12px; text-align:left; font-weight:600; color:#546e7a; border-bottom:2px solid #cfd8dc; white-space:nowrap; }
+        .data-table td { padding:9px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+        .data-table tr:hover td { background:#f5f5f5; }
+
+        /* 배지 */
+        .badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap; }
+        .badge-admitted          { background:#e0f2fe; color:#0369a1; }
+        .badge-discharge-ordered { background:#fef3c7; color:#92400e; }
+        .badge-discharged        { background:#f0fdf4; color:#166534; }
+        .badge-no-avail          { background:#fee2e2; color:#991b1b; }
+        .badge-avail             { background:#dcfce7; color:#166534; }
+
+        /* 액션 버튼 */
+        .action-btns { display:flex; gap:5px; flex-wrap:wrap; }
+        .btn-xs { padding:4px 10px; border:none; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; }
+        .btn-admit    { background:#dcfce7; color:#166534; }
+        .btn-admit:hover    { background:#bbf7d0; }
+        .btn-discharge { background:#fef3c7; color:#92400e; }
+        .btn-discharge:hover { background:#fde68a; }
+
+        .empty-msg { text-align:center; padding:40px; color:#90a4ae; }
+        #errMsg { color:#e53935; font-size:13px; margin-bottom:10px; min-height:18px; }
+
+        /* 모달 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; align-items:center; justify-content:center; }
+        .modal-overlay.open { display:flex; }
+        .modal-box { background:#fff; border-radius:12px; max-width:480px; width:100%; overflow:hidden; display:flex; flex-direction:column; }
+        .modal-header { padding:18px 22px 14px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
+        .modal-header h3 { margin:0; font-size:16px; font-weight:800; color:#1e293b; }
+        .modal-body { padding:18px 22px; }
+        .modal-footer { padding:12px 22px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end; background:#f8fafc; }
+        .modal-close { background:none; border:none; font-size:18px; cursor:pointer; color:#78909c; }
+
+        .form-group { margin-bottom:14px; }
+        .form-group label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; }
+        .form-group input, .form-group textarea {
+            width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:6px;
+            font-size:13px; box-sizing:border-box; background:#f9fafb;
+        }
+        .form-group input:focus { border-color:#059669; background:#fff; outline:none; }
+        .info-row { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:12px; font-size:13px; }
+        .info-item .lbl { font-size:11px; color:#94a3b8; font-weight:600; }
+        .info-item .val { font-weight:600; color:#1e293b; }
+        .ward-info-box { background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:12px 16px; margin-bottom:14px; font-size:13px; }
+        .ward-info-box .wt { font-size:11px; color:#94a3b8; font-weight:600; margin-bottom:4px; }
+        .ward-info-box .wv { font-weight:700; color:#166534; }
+        .err-inline { color:#e53935; font-size:12px; margin-top:6px; display:none; }
+
+        .btn-submit { padding:9px 20px; background:#059669; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:700; cursor:pointer; }
+        .btn-submit:hover { background:#047857; }
+        .btn-submit:disabled { opacity:.5; cursor:not-allowed; }
+        .btn-close-m { padding:9px 20px; background:#e2e8f0; color:#374151; border:none; border-radius:6px; font-size:14px; cursor:pointer; }
+    </style>
+</head>
+<body>
+<div id="page-content">
+
+<!-- 입원 승인 모달 -->
+<div class="modal-overlay" id="admitModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-bed" style="margin-right:6px;color:#059669;"></i>입원 승인</h3>
+            <button class="modal-close" onclick="closeAdmitModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="info-row" id="admitPatientInfo"></div>
+            <div class="ward-info-box" id="admitWardBox" style="display:none;"></div>
+            <div class="form-group">
+                <label>퇴원 예정일</label>
+                <input type="date" id="admitExpDate">
+            </div>
+            <div class="form-group">
+                <label>메모 (선택)</label>
+                <input type="text" id="admitNotes" placeholder="특이사항 등">
+            </div>
+            <div class="err-inline" id="admitErr"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-submit" id="admitSubmitBtn" onclick="doAdmit()">
+                <i class="fas fa-check" style="margin-right:5px;"></i>입원 승인
+            </button>
+            <button class="btn-close-m" onclick="closeAdmitModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 퇴원 처리 확인 모달 -->
+<div class="modal-overlay" id="dischargeModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-sign-out-alt" style="margin-right:6px;color:#0ea5e9;"></i>퇴원 처리</h3>
+            <button class="modal-close" onclick="closeDischargeModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:13px;color:#374151;margin:0 0 8px;">
+                아래 환자를 퇴원 처리하시겠습니까?
+            </p>
+            <div class="info-row" id="dischargePatientInfo"></div>
+            <div class="err-inline" id="dischargeErr"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-submit" id="dischargeSubmitBtn" style="background:#0ea5e9;" onclick="doDischarge()">
+                <i class="fas fa-sign-out-alt" style="margin-right:5px;"></i>퇴원 처리
+            </button>
+            <button class="btn-close-m" onclick="closeDischargeModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<div class="page-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h2 style="margin:0;font-size:20px;font-weight:800;color:#1e293b;">입원 관리</h2>
+        <button class="btn-xs" style="padding:7px 14px;background:#e2e8f0;color:#475569;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;" onclick="loadActiveTab()">
+            <i class="fas fa-sync-alt" style="margin-right:4px;"></i>새로고침
+        </button>
+    </div>
+
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tab-pending" onclick="switchTab('pending')">
+            <i class="fas fa-clock" style="margin-right:5px;"></i>입원 승인 대기
+            <span id="pendingCount" style="margin-left:5px;background:#e0f2fe;color:#0369a1;padding:1px 6px;border-radius:8px;font-size:10px;"></span>
+        </button>
+        <button class="tab-btn" id="tab-current" onclick="switchTab('current')">
+            <i class="fas fa-bed" style="margin-right:5px;"></i>현재 입원 환자
+            <span id="currentCount" style="margin-left:5px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:8px;font-size:10px;"></span>
+        </button>
+    </div>
+
+    <div id="errMsg"></div>
+
+    <!-- 입원 승인 대기 탭 -->
+    <div id="pane-pending">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>예약일시</th>
+                    <th>환자명</th>
+                    <th>진료과</th>
+                    <th>선호 병실</th>
+                    <th>병상 가용</th>
+                    <th>메모</th>
+                    <th>처리</th>
+                </tr>
+            </thead>
+            <tbody id="pendingBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 현재 입원 환자 탭 -->
+    <div id="pane-current" style="display:none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>환자명</th>
+                    <th>병동</th>
+                    <th>호실</th>
+                    <th>병실 유형</th>
+                    <th>입원일</th>
+                    <th>퇴원 예정일</th>
+                    <th>상태</th>
+                    <th>처리</th>
+                </tr>
+            </thead>
+            <tbody id="currentBody"></tbody>
+        </table>
+    </div>
+</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/router.js"></script>
+<script>
+    const ROOM_TYPE_LBL = { single:'1인실', double:'2인실', shared:'다인실' };
+    const STATUS_LBL = { ADMITTED:'입원중', DISCHARGE_ORDERED:'퇴원 지시', DISCHARGED:'퇴원' };
+    const STATUS_CLS = { ADMITTED:'badge-admitted', DISCHARGE_ORDERED:'badge-discharge-ordered', DISCHARGED:'badge-discharged' };
+
+    let _activeTab = 'pending';
+    let _pendingList = [];
+    let _currentList = [];
+    let _admitApptId = null;
+    let _admitPatientName = null;
+    let _dischargeAdmId = null;
+    let _dischargePatientName = null;
+
+    // ── 초기화 ─────────────────────────────────────────────────
+
+    async function init() {
+        const me = await initLayout();
+        if (!me) return;
+        if (!['nurse', 'admin'].includes(me.role)) {
+            alert('간호사·관리자만 접근할 수 있습니다.');
+            loadPage('index.html');
+            return;
+        }
+        await loadActiveTab();
+    }
+
+    async function loadActiveTab() {
+        if (_activeTab === 'pending') await loadPending();
+        else await loadCurrent();
+    }
+
+    // ── 탭 전환 ────────────────────────────────────────────────
+
+    function switchTab(tab) {
+        _activeTab = tab;
+        document.getElementById('tab-pending').classList.toggle('active', tab === 'pending');
+        document.getElementById('tab-current').classList.toggle('active', tab === 'current');
+        document.getElementById('pane-pending').style.display = tab === 'pending' ? '' : 'none';
+        document.getElementById('pane-current').style.display = tab === 'current' ? '' : 'none';
+        if (tab === 'pending') loadPending();
+        else loadCurrent();
+    }
+
+    // ── 입원 승인 대기 목록 ────────────────────────────────────
+
+    async function loadPending() {
+        const tbody = document.getElementById('pendingBody');
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 조회 중...</td></tr>`;
+        const res = await apiCall('/emr/nurse/admissions/pending');
+        if (!res || !res.ok) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">목록을 불러오지 못했습니다.</td></tr>`;
+            return;
+        }
+        _pendingList = await res.json();
+        document.getElementById('pendingCount').textContent = _pendingList.length || '';
+        renderPending();
+    }
+
+    function renderPending() {
+        const tbody = document.getElementById('pendingBody');
+        if (!_pendingList.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">입원 승인 대기 예약이 없습니다.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = _pendingList.map(a => {
+            const roomLbl = ROOM_TYPE_LBL[a.room_type_pref] || a.room_type_pref || '무관';
+            const availBadge = a.ward_available
+                ? `<span class="badge badge-avail"><i class="fas fa-check" style="margin-right:3px;"></i>가용</span>`
+                : `<span class="badge badge-no-avail"><i class="fas fa-times" style="margin-right:3px;"></i>만실</span>`;
+            return `
+            <tr>
+                <td>${_esc(a.appointment_date)} ${_esc(a.appointment_time||'')}</td>
+                <td style="font-weight:600;">${_esc(a.patient_name)}</td>
+                <td>${_esc(a.department_code||'-')}</td>
+                <td>${_esc(roomLbl)}</td>
+                <td>${availBadge}</td>
+                <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.notes||'-')}</td>
+                <td>
+                    <div class="action-btns">
+                        ${a.ward_available
+                            ? `<button class="btn-xs btn-admit" onclick="openAdmitModal('${a.appointment_id}','${_esc(a.patient_name)}','${a.department_code||''}','${a.room_type_pref||''}')">
+                                <i class="fas fa-bed" style="margin-right:3px;"></i>입원 승인
+                               </button>`
+                            : `<span style="font-size:11px;color:#94a3b8;">배정 불가</span>`}
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── 현재 입원 환자 목록 ────────────────────────────────────
+
+    async function loadCurrent() {
+        const tbody = document.getElementById('currentBody');
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 조회 중...</td></tr>`;
+        const res = await apiCall('/emr/nurse/admissions/current');
+        if (!res || !res.ok) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-msg">목록을 불러오지 못했습니다.</td></tr>`;
+            return;
+        }
+        _currentList = await res.json();
+        document.getElementById('currentCount').textContent = _currentList.length || '';
+        renderCurrent();
+    }
+
+    function renderCurrent() {
+        const tbody = document.getElementById('currentBody');
+        if (!_currentList.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-msg">현재 입원 환자가 없습니다.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = _currentList.map(a => {
+            const stCls = STATUS_CLS[a.status] || '';
+            const stLbl = STATUS_LBL[a.status] || a.status;
+            const admDate = a.admitted_at ? a.admitted_at.replace('T',' ').slice(0,16) : '-';
+            const expDate = a.expected_discharge_date || '-';
+            const roomLbl = ROOM_TYPE_LBL[a.room_type] || a.room_type || '-';
+            const canDischarge = a.status === 'DISCHARGE_ORDERED';
+            return `
+            <tr>
+                <td style="font-weight:600;">${_esc(a.patient_name)}</td>
+                <td>${_esc(a.ward_name||'-')}</td>
+                <td>${_esc(a.room_number||'-')}</td>
+                <td>${_esc(roomLbl)}</td>
+                <td>${_esc(admDate)}</td>
+                <td>${_esc(expDate)}</td>
+                <td><span class="badge ${stCls}">${_esc(stLbl)}</span></td>
+                <td>
+                    <div class="action-btns">
+                        ${canDischarge
+                            ? `<button class="btn-xs btn-discharge" onclick="openDischargeModal('${a.admission_id}','${_esc(a.patient_name)}')">
+                                <i class="fas fa-sign-out-alt" style="margin-right:3px;"></i>퇴원 처리
+                               </button>`
+                            : `<span style="font-size:11px;color:#94a3b8;">의사 지시 대기</span>`}
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── 입원 승인 모달 ─────────────────────────────────────────
+
+    function openAdmitModal(apptId, patientName, deptCode, roomTypePref) {
+        _admitApptId     = apptId;
+        _admitPatientName = patientName;
+        document.getElementById('admitErr').style.display = 'none';
+        document.getElementById('admitExpDate').value = '';
+        document.getElementById('admitNotes').value   = '';
+
+        document.getElementById('admitPatientInfo').innerHTML = `
+            <div class="info-item"><div class="lbl">환자명</div><div class="val">${_esc(patientName)}</div></div>
+            <div class="info-item"><div class="lbl">진료과</div><div class="val">${_esc(deptCode||'-')}</div></div>
+            <div class="info-item"><div class="lbl">선호 병실</div><div class="val">${_esc(ROOM_TYPE_LBL[roomTypePref]||roomTypePref||'무관')}</div></div>
+        `;
+
+        const wardBox = document.getElementById('admitWardBox');
+        wardBox.innerHTML = `<div class="wt">병동 배정</div><div class="wv"><i class="fas fa-spinner fa-spin"></i> 가용 병상 확인 중...</div>`;
+        wardBox.style.display = '';
+
+        // 가용 병동 미리 표시
+        apiCall(`/emr/nurse/admissions/pending`).then(async r => {
+            if (!r || !r.ok) return;
+            const list = await r.json();
+            const item = list.find(x => x.appointment_id === apptId);
+            if (item && item.ward_available) {
+                wardBox.innerHTML = `<div class="wt">병동 배정</div><div class="wv"><i class="fas fa-check-circle" style="margin-right:4px;"></i>가용 병상 있음 — 승인 시 자동 배정됩니다.</div>`;
+            } else {
+                wardBox.innerHTML = `<div class="wt">병동 배정</div><div class="wv" style="color:#ef4444;"><i class="fas fa-times-circle" style="margin-right:4px;"></i>가용 병상 없음</div>`;
+                document.getElementById('admitSubmitBtn').disabled = true;
+            }
+        });
+
+        document.getElementById('admitSubmitBtn').disabled = false;
+        document.getElementById('admitModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeAdmitModal() {
+        document.getElementById('admitModal').classList.remove('open');
+        document.body.style.overflow = '';
+        _admitApptId = null;
+    }
+
+    async function doAdmit() {
+        const errEl = document.getElementById('admitErr');
+        errEl.style.display = 'none';
+        const btn = document.getElementById('admitSubmitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px;"></i>처리 중...';
+
+        const expDate = document.getElementById('admitExpDate').value;
+        const notes   = document.getElementById('admitNotes').value.trim();
+
+        const body = { appointment_id: _admitApptId };
+        if (expDate) body.expected_discharge_date = expDate;
+        if (notes)   body.notes = notes;
+
+        try {
+            const res = await apiCall('/emr/nurse/admissions', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+            if (res && res.ok) {
+                const data = await res.json();
+                closeAdmitModal();
+                document.getElementById('errMsg').textContent = '';
+                alert(`입원 승인 완료\n병동: ${data.ward_name||'-'} | 호실: ${data.room_number||'-'}`);
+                await loadPending();
+                await loadCurrent();
+                switchTab('current');
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                errEl.textContent = err.detail || '입원 승인 중 오류가 발생했습니다.';
+                errEl.style.display = 'block';
+            }
+        } catch {
+            errEl.textContent = '서버 오류가 발생했습니다.';
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check" style="margin-right:5px;"></i>입원 승인';
+        }
+    }
+
+    // ── 퇴원 처리 모달 ─────────────────────────────────────────
+
+    function openDischargeModal(admId, patientName) {
+        _dischargeAdmId       = admId;
+        _dischargePatientName = patientName;
+        document.getElementById('dischargeErr').style.display = 'none';
+        document.getElementById('dischargePatientInfo').innerHTML = `
+            <div class="info-item"><div class="lbl">환자명</div><div class="val">${_esc(patientName)}</div></div>
+        `;
+        const btn = document.getElementById('dischargeSubmitBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-out-alt" style="margin-right:5px;"></i>퇴원 처리';
+        document.getElementById('dischargeModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDischargeModal() {
+        document.getElementById('dischargeModal').classList.remove('open');
+        document.body.style.overflow = '';
+        _dischargeAdmId = null;
+    }
+
+    async function doDischarge() {
+        const errEl = document.getElementById('dischargeErr');
+        errEl.style.display = 'none';
+        const btn = document.getElementById('dischargeSubmitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px;"></i>처리 중...';
+
+        try {
+            const res = await apiCall(`/emr/nurse/admissions/${_dischargeAdmId}/discharge`, {
+                method: 'PATCH',
+            });
+            if (res && res.ok) {
+                closeDischargeModal();
+                document.getElementById('errMsg').textContent = '';
+                await loadCurrent();
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                errEl.textContent = err.detail || '퇴원 처리 중 오류가 발생했습니다.';
+                errEl.style.display = 'block';
+            }
+        } catch {
+            errEl.textContent = '서버 오류가 발생했습니다.';
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sign-out-alt" style="margin-right:5px;"></i>퇴원 처리';
+        }
+    }
+
+    function _esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    init();
+</script>
+</body>
+</html>
